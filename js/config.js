@@ -160,9 +160,9 @@ window.APP_CONFIG = {
          - 纯前端网站公开 anon key 属正常做法（个人自用数据风险低）
        ================================================================= */
     supabase: {
-        url: "【需填写】形如 https://xxxx.supabase.co",
-        anonKey: "【需填写】anon public key（Project Settings → API）",
-        enabled: false,          // ← 填好上面两项后改成 true
+        url: "https://cvjlmkmbodembszqjqso.supabase.co",
+        anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2amxta21ib2RlbWJzenFqcXNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MDQzNjgsImV4cCI6MjEwMjE4MDM2OH0.BTz3ZVDlaWr-0V6EwrEfJNXFHkWLBMF5jXheg2DYk3c",
+        enabled: true,
         syncId: "main"           // 同一份数据的标识，一般不用改
     },
 
