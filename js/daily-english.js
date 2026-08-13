@@ -8,6 +8,7 @@
    4. 每段"一键翻译"按钮 + "翻译全文"按钮
    5. "换一篇"切换下一篇 RSS 文章
    6. 翻译结果 + 文章列表本地缓存（当天 6 小时，避免重复外网请求）
+   7. 智能多段拼接：单篇过短时自动追加后续文章，保证大篇幅阅读量
    ===================================================================== */
 
 const DailyEnglish = (() => {
@@ -19,6 +20,11 @@ const DailyEnglish = (() => {
     let articleIndex = 0;      // 当前展示第几篇
     // 翻译缓存：{ 段落文本hash -> 中文 }
     const transCache = {};
+
+    /* ---------- 阅读量配置 ---------- */
+    const MIN_PARAS = 5;           // 最少段数（不足则追加下一篇）
+    const MIN_CHARS = 800;         // 最少字符数（不足则追加）
+    const MAX_ARTICLES = 3;        // 最多拼接几篇文章（避免无限加载）
 
     /* ---------- DOM ---------- */
     const els = {
@@ -104,7 +110,29 @@ const DailyEnglish = (() => {
         articleIndex = 0;
     }
 
-    /* ---------- 加载并展示一篇文章 ---------- */
+    /* ---------- 确保单篇文章有足够内容（尝试抓全文补齐） ---------- */
+    async function enrichArticle(article) {
+        let paras = article.paras || [];
+
+        // description 提取的内容太少 → 尝试抓全文
+        if (paras.join(" ").replace(/\s/g, "").length < 120 || paras.length < 2) {
+            try {
+                const full = await Api.fetchArticleParagraphs(article.link);
+                if (full.length >= paras.length) {
+                    paras = full;
+                    article.paras = full;
+                }
+            } catch (e) {
+                console.warn("正文抓取失败:", article.title, e);
+            }
+        }
+
+        if (!paras.length) paras = [article.title];
+        article.paras = paras;
+        return paras;
+    }
+
+    /* ---------- 加载并展示文章（智能多段拼接） ---------- */
     async function loadArticle() {
         const meta = els.meta();
         const body = els.body();
@@ -116,37 +144,47 @@ const DailyEnglish = (() => {
 
         try {
             await ensureArticles();
-            const article = articleList[articleIndex];
-            if (!article) throw new Error("没有可用文章");
 
-            // 展示标题与元信息
-            meta.innerHTML = `
-                <span class="meta-title">${escapeHtml(article.title)}</span>
-                ${article.pubDate ? `<span>📅 ${new Date(article.pubDate).toLocaleDateString()}</span>` : ""}
-                <span>📰 ${escapeHtml(article.source)}</span>
-                <a class="meta-link" href="${article.link}" target="_blank" rel="noopener">查看原文 ↗</a>
-            `;
+            // 收集足够多的段落：从当前文章开始，不足则追加后续篇
+            const allParas = [];       // 所有段落文本
+            const allArticles = [];    // 涉及的文章（用于显示来源）
+            let idx = articleIndex;
+            let attempts = 0;
 
-            // A：优先用预提取的段落（来自 RSS description，免去跨代理抓整页，秒开）
-            let paras = article.paras || [];
+            while (attempts < MAX_ARTICLES && idx < articleList.length) {
+                const art = articleList[idx];
+                const paras = await enrichArticle(art);
+                allParas.push(...paras);
+                allArticles.push(art);
+                attempts++;
 
-            // description 过短（如 BBC 摘要）才回退抓一次全文补齐，并写回缓存
-            if (paras.join(" ").replace(/\s/g, "").length < 200) {
-                try {
-                    const full = await Api.fetchArticleParagraphs(article.link);
-                    if (full.length) {
-                        paras = full;
-                        article.paras = full;
-                        setCache(currentSource, articleList);
-                    }
-                } catch (e) {
-                    console.warn("正文抓取失败:", e);
-                }
+                // 够长了就停
+                const totalText = allParas.join(" ").replace(/\s/g, "");
+                if (allParas.length >= MIN_PARAS && totalText.length >= MIN_CHARS) break;
+
+                idx++;
             }
 
-            if (!paras.length) paras = [article.title];
+            // 如果循环完还是太短（比如列表就几篇短文），至少保证有内容
+            if (!allParas.length) throw new Error("没有可用文章");
 
-            renderParagraphs(paras, article);
+            // 记录拼接篇数，供"换一篇"跳过用
+            lastArticleCount = Math.max(allArticles.length, 1);
+
+            const primaryArticle = allArticles[0];
+
+            // 展示标题与元信息（多篇时用主文章标题 + 篇数提示）
+            const multiLabel = allArticles.length > 1
+                ? ` <span style="font-size:12px;color:var(--text-faint);font-weight:400;">（已拼接 ${allArticles.length} 篇）</span>`
+                : "";
+            meta.innerHTML = `
+                <span class="meta-title">${escapeHtml(primaryArticle.title)}${multiLabel}</span>
+                ${primaryArticle.pubDate ? `<span>📅 ${new Date(primaryArticle.pubDate).toLocaleDateString()}</span>` : ""}
+                <span>📰 ${escapeHtml(primaryArticle.source)}</span>
+                <a class="meta-link" href="${primaryArticle.link}" target="_blank" rel="noopener">查看原文 ↗</a>
+            `;
+
+            renderParagraphs(allParas, allArticles);
 
         } catch (e) {
             console.error("每日英语加载失败:", e);
@@ -155,17 +193,48 @@ const DailyEnglish = (() => {
     }
 
     /* ---------- 渲染段落（英文原文 + 待翻译占位） ---------- */
-    function renderParagraphs(paras, article) {
+    function renderParagraphs(paras, articles) {
         const body = els.body();
-        body.innerHTML = paras.map((p, i) => `
+        const isMulti = Array.isArray(articles) && articles.length > 1;
+
+        // 构建每篇文章的段落范围，用于插入分隔线
+        const articleBounds = []; // { startIdx, endIdx, article }
+        if (isMulti) {
+            let pIdx = 0;
+            for (const art of articles) {
+                const count = (art.paras || []).length;
+                if (count > 0) {
+                    articleBounds.push({ startIdx: pIdx, endIdx: pIdx + count - 1, article: art });
+                    pIdx += count;
+                }
+            }
+        }
+
+        let html = "";
+        paras.forEach((p, i) => {
+            // 在第二篇及之后的文章前插入分隔线
+            if (isMulti) {
+                const bound = articleBounds.find(b => b.startIdx === i);
+                if (bound && bound.startIdx > 0) {
+                    html += `<div class="article-divider">
+                        <span class="divider-line"></span>
+                        <span class="divider-label">📄 ${escapeHtml(bound.article.title)}</span>
+                        <span class="divider-line"></span>
+                    </div>`;
+                }
+            }
+
+            html += `
             <div class="para-block" data-idx="${i}">
                 <p class="para-en">${escapeHtml(p)}</p>
                 <div class="para-zh hidden" data-trans="${i}"></div>
                 <div class="para-actions">
                     <button class="btn btn-ghost btn-sm translate-one" data-idx="${i}">一键翻译</button>
                 </div>
-            </div>
-        `).join("");
+            </div>`;
+        });
+
+        body.innerHTML = html;
 
         // 绑定单段翻译
         body.querySelectorAll(".translate-one").forEach(btn => {
@@ -173,9 +242,11 @@ const DailyEnglish = (() => {
         });
 
         // 来源信息
+        const primary = Array.isArray(articles) ? articles[0] : articles;
+        const countLabel = isMulti ? `${articles.length} 篇拼接` : "1 篇";
         els.footer().innerHTML = `
-            来源：<a href="${article.link}" target="_blank" rel="noopener">${escapeHtml(article.source)}</a>
-            · 共 ${paras.length} 段 · 选中任意单词可加入生词库
+            来源：<a href="${primary.link}" target="_blank" rel="noopener">${escapeHtml(primary.source)}</a>
+            · ${countLabel} · 共 ${paras.length} 段 · 选中任意单词可加入生词库
         `;
     }
 
@@ -232,13 +303,17 @@ const DailyEnglish = (() => {
         Api.showToast("全文翻译完成", "success");
     }
 
-    /* ---------- 换一篇 ---------- */
+    /* ---------- 换一篇（跳过本次已展示的文章） ---------- */
+    let lastArticleCount = 1; // 上次展示了几篇（用于跳过）
+
     async function nextArticle() {
         if (!articleList.length) {
             await loadArticle();
             return;
         }
-        articleIndex = (articleIndex + 1) % articleList.length;
+        // 跳过上次拼接过的文章数，避免重复
+        articleIndex = (articleIndex + lastArticleCount) % articleList.length;
+        if (articleIndex === 0) lastArticleCount = 0; // 循环回头时不额外跳
         await loadArticle();
     }
 
