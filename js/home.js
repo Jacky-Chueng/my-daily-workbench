@@ -44,9 +44,9 @@ const Home = (() => {
         const display = items.slice(0, 6);
         list.innerHTML = display.map(t => `
             <li class="todo-item ${t.done ? "done" : ""}">
-                <input type="checkbox" class="todo-check" data-id="${t.createdAt}" ${t.done ? "checked" : ""}>
+                <input type="checkbox" class="todo-check" data-id="${t.id}" ${t.done ? "checked" : ""}>
                 <span class="todo-text">${escapeHtml(t.text)}</span>
-                <button class="todo-del" data-id="${t.createdAt}" title="删除">✕</button>
+                <button class="todo-del" data-id="${t.id}" title="删除">✕</button>
             </li>
         `).join("");
 
@@ -55,10 +55,10 @@ const Home = (() => {
         }
 
         list.querySelectorAll(".todo-check").forEach(cb => {
-            cb.addEventListener("change", () => toggleTodo(Number(cb.dataset.id)));
+            cb.addEventListener("change", () => toggleTodo(cb.dataset.id));
         });
         list.querySelectorAll(".todo-del").forEach(btn => {
-            btn.addEventListener("click", () => removeTodo(Number(btn.dataset.id)));
+            btn.addEventListener("click", () => removeTodo(btn.dataset.id));
         });
 
         // "查看全部" 跳转
@@ -83,9 +83,9 @@ const Home = (() => {
         Api.showToast("已添加待办", "success");
     }
 
-    function toggleTodo(createdAt) {
+    function toggleTodo(id) {
         const items = Todo.load();
-        const item = items.find(t => t.createdAt === createdAt);
+        const item = items.find(t => t.id === id);
         if (item) {
             item.done = !item.done;
             if (item.done) item.completedAt = Date.now();
@@ -95,9 +95,9 @@ const Home = (() => {
         }
     }
 
-    function removeTodo(createdAt) {
+    function removeTodo(id) {
         const items = Todo.load();
-        const idx = items.findIndex(t => t.createdAt === createdAt);
+        const idx = items.findIndex(t => t.id === id);
         if (idx >= 0) {
             items.splice(idx, 1);
             Todo.save(items);

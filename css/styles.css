@@ -928,6 +928,46 @@ button { font-family: inherit; cursor: pointer; }
 .todo-item:hover .todo-del { opacity: 1; }
 .todo-del:hover { background: var(--danger-soft); color: var(--danger); }
 
+.todo-edit {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    font-size: 15px;
+    padding: 4px 7px;
+    border-radius: 6px;
+    transition: all .3s var(--ease);
+    opacity: 0;
+}
+.todo-item:hover .todo-edit { opacity: 1; }
+.todo-edit:hover { background: var(--border-soft); color: var(--primary); }
+
+/* 行内编辑态 */
+.todo-item.editing { padding: 8px 4px; gap: 8px; }
+.todo-edit-input {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    padding: 7px 10px;
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+}
+.todo-edit-save, .todo-edit-cancel {
+    background: none;
+    border: none;
+    font-size: 15px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .3s var(--ease);
+}
+.todo-edit-save { color: var(--primary); }
+.todo-edit-save:hover { background: var(--primary-soft); }
+.todo-edit-cancel { color: var(--text-faint); }
+.todo-edit-cancel:hover { background: var(--border-soft); }
+
 /* =====================================================================
    心情记录模块
    ===================================================================== */
@@ -995,6 +1035,61 @@ button { font-family: inherit; cursor: pointer; }
     font-size: 13px;
     letter-spacing: .02em;
 }
+
+/* 历史条目操作（编辑 / 删除）*/
+.mood-history-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity .3s var(--ease);
+}
+.mood-history-item:hover .mood-history-actions { opacity: 1; }
+.mood-edit, .mood-del {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    font-size: 14px;
+    padding: 4px 7px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .3s var(--ease);
+}
+.mood-edit:hover { background: var(--border-soft); color: var(--primary); }
+.mood-del:hover { background: var(--danger-soft); color: var(--danger); }
+
+/* 正在编辑的历史条目高亮 */
+.mood-history-item.editing {
+    background: var(--lavender-soft);
+    border-radius: var(--radius-sm);
+}
+
+/* 编辑提示条 */
+.mood-edit-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px 24px 0;
+    padding: 9px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--lavender-soft);
+    color: var(--text);
+    font-size: 12.5px;
+    letter-spacing: .02em;
+}
+.mood-edit-banner[hidden] { display: none; }
+.btn-text {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 12.5px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition: background .3s var(--ease);
+}
+.btn-text:hover { background: var(--lavender); color: #fff; }
 
 /* =====================================================================
    Toast 提示
