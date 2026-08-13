@@ -27,8 +27,8 @@ const CloudSync = (() => {
     let statusEl = null;
     let cloudEmpty = true;        // 上次 pull 时云端是否为空（用于首设备播种）
 
-    // 仅同步这三类用户数据
-    const SYNC_KEYS = [KEYS.vocabulary, KEYS.todos, KEYS.moods];
+    // 同步的用户数据：生词 / 待办 / 心情 / 首页布局
+    const SYNC_KEYS = [KEYS.vocabulary, KEYS.todos, KEYS.moods, KEYS.homeLayout];
 
     /* ---------- 状态提示 ---------- */
     function setStatus(state, text) {
@@ -86,6 +86,8 @@ const CloudSync = (() => {
             return mergeArray(local || [], remote || [], t => t.id);
         if (key === KEYS.moods)
             return mergeObject(local || {}, remote || {});
+        if (key === KEYS.homeLayout)
+            return remote;   // 布局偏好：last-write-wins（云端覆盖本地）
         return remote;
     }
 

@@ -191,6 +191,7 @@
         Todo.init();
         Mood.init();
         Home.init();
+        HomeLayout.init();   // 首页自定义布局（需在 CloudSync 之前注册同步监听）
         DataIO.init();
 
         // 同步侧边栏统计

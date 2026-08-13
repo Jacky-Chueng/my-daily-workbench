@@ -1179,6 +1179,59 @@ button { font-family: inherit; cursor: pointer; }
     align-items: start;
 }
 
+/* ---------- 首页自定义布局 ---------- */
+.home-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+.home-toolbar-hint {
+    display: none;
+    font-size: 12.5px;
+    color: var(--text-faint);
+}
+#editLayoutBtn.active {
+    background: var(--lavender);
+    color: #fff;
+    border-color: var(--lavender);
+}
+
+/* 编辑模式：单列以便拖拽排序 */
+.home-grid.editing {
+    display: flex;
+    flex-direction: column;
+}
+.home-grid.editing .card {
+    cursor: grab;
+    border-style: dashed;
+    border-color: var(--lavender);
+}
+.home-grid.editing .card:active { cursor: grabbing; }
+.home-grid.editing .card.dragging { opacity: .4; }
+.home-grid.editing .card.is-hidden {
+    opacity: .5;
+    filter: grayscale(.8);
+    border-style: solid;
+    border-color: var(--border-soft);
+}
+
+/* 编辑模式：卡片显隐开关（注入到 card-head） */
+.layout-hide-btn {
+    border: 1px solid var(--border-soft);
+    background: var(--bg-soft);
+    color: var(--text-soft);
+    font-size: 12px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all .2s var(--ease);
+}
+.layout-hide-btn:hover {
+    border-color: var(--lavender);
+    color: var(--text);
+}
+
 /* 天气卡 */
 .weather-cities {
     display: flex;

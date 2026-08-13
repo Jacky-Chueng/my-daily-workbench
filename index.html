@@ -127,9 +127,9 @@
 
             <!-- 页面：首页（天气 + 黄历） -->
             <section class="page active" id="page-home">
-                <div class="home-grid">
+                <div class="home-grid" id="homeGrid">
                     <!-- 天气卡 -->
-                    <article class="card card-weather">
+                    <article class="card card-weather" id="card-weather">
                         <div class="card-head">
                             <h2><span class="emoji">&#127780;&#65039;</span> 今日天气</h2>
                         </div>
@@ -154,7 +154,7 @@
                     </article>
 
                     <!-- 首页待办清单 -->
-                    <article class="card card-home-todo">
+                    <article class="card card-home-todo" id="card-home-todo">
                         <div class="card-head">
                             <h2><span class="emoji">&#9989;</span> 待办清单 <span class="count-badge" id="homeTodoCount">0</span></h2>
                             <a href="#" class="link-more" data-goto="todo">全部 →</a>
@@ -167,7 +167,7 @@
                     </article>
 
                     <!-- 首页生词复习 -->
-                    <article class="card card-home-vocab">
+                    <article class="card card-home-vocab" id="card-home-vocab">
                         <div class="card-head">
                             <h2><span class="emoji">&#128451;&#65039;</span> 生词复习</h2>
                             <button id="refreshVocabCard" class="btn btn-ghost btn-sm">换一批</button>
@@ -294,6 +294,7 @@
     <script src="js/todo.js"></script>
     <script src="js/mood.js"></script>
     <script src="js/home.js"></script>
+    <script src="js/home-layout.js"></script>
     <script src="js/data-io.js"></script>
     <!-- Supabase 云同步（需先在 config.js 配置并建表，见 SUPABASE_SETUP.md） -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

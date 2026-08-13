@@ -166,6 +166,7 @@ window.APP_CONFIG = {
         todosLegacy: "dw_todos_",
         moods: "dw_moods",
         theme: "dw_theme",
-        articleIndex: "dw_article_idx_"
+        articleIndex: "dw_article_idx_",
+        homeLayout: "dw_home_layout"     // 首页自定义布局（排序+显隐）
     }
 };
