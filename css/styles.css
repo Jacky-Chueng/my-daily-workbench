@@ -275,20 +275,19 @@ button { font-family: inherit; cursor: pointer; }
     background: linear-gradient(135deg, var(--lavender) 0%, var(--lavender-dark) 100%);
     color: #fff;
     border-radius: var(--radius-sm);
-    padding: 11px 13px;
+    padding: 12px 14px;
     box-shadow: var(--shadow-quote);
     position: relative;
-    overflow: hidden;
 }
 [data-theme="dark"] .quote-card { color: #1f1d1a; }
 
 .quote-card::before {
     content: '';
     position: absolute;
-    top: -50%;
-    right: -30%;
-    width: 72px;
-    height: 72px;
+    top: 4px;
+    right: 6px;
+    width: 52px;
+    height: 52px;
     background: rgba(255,255,255,.12);
     border-radius: 50%;
     pointer-events: none;
