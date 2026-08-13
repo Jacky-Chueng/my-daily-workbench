@@ -97,9 +97,13 @@ const DailyEnglish = (() => {
                 console.warn("正文抓取失败:", e);
             }
 
-            // 若正文提取失败，用 description 兜底
+            // 若正文提取失败，用 description 兜底（需剥离 HTML 标签）
             if (!paras.length) {
-                paras = [article.description || article.title];
+                const desc = article.description || article.title;
+                // description 通常是 HTML 片段，用 DOMParser 提取纯文本
+                const doc = new DOMParser().parseFromString(desc, "text/html");
+                const plain = doc.body.textContent.replace(/\s+/g, " ").trim();
+                paras = plain.length >= 40 ? [plain] : [article.title];
             }
 
             renderParagraphs(paras, article);
