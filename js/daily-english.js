@@ -3,11 +3,11 @@
    ---------------------------------------------------------------------
    功能：
    1. 从 RSS 获取最新文章列表（默认 The Guardian，可切换 BBC/Reuters）
-   2. 抓取文章全文并抽取段落
+   2. 优先用 RSS 摘要（description）抽取段落，过短才抓取全文（提速关键）
    3. 英文原文 + 中文翻译对照展示
    4. 每段"一键翻译"按钮 + "翻译全文"按钮
    5. "换一篇"切换下一篇 RSS 文章
-   6. 翻译结果缓存（避免重复请求）
+   6. 翻译结果 + 文章列表本地缓存（当天 6 小时，避免重复外网请求）
    ===================================================================== */
 
 const DailyEnglish = (() => {
@@ -59,6 +59,51 @@ const DailyEnglish = (() => {
         throw new Error(`无法获取 ${src.name} 的 RSS`);
     }
 
+    /* ---------- 本地缓存（当天 + 6 小时） ---------- */
+    // 缓存结构：{ source, ts, articles:[{title,link,pubDate,source,paras:[...]}] }
+    const CACHE_KEY = "dw_english_cache";
+    const CACHE_TTL = 6 * 60 * 60 * 1000;
+
+    function getCache(sourceKey) {
+        const c = Api.store.get(CACHE_KEY, null);
+        if (!c || c.source !== sourceKey) return null;
+        if (Date.now() - c.ts > CACHE_TTL) return null;
+        return c.articles;
+    }
+    function setCache(sourceKey, articles) {
+        Api.store.set(CACHE_KEY, { source: sourceKey, ts: Date.now(), articles });
+    }
+
+    // 从 RSS description（HTML 片段）提取纯文本段落；无 <p> 则取整体文本
+    function extractParas(htmlOrText) {
+        if (!htmlOrText) return [];
+        const doc = new DOMParser().parseFromString(htmlOrText, "text/html");
+        const ps = Array.from(doc.querySelectorAll("p"))
+            .map(p => p.textContent.replace(/\s+/g, " ").trim())
+            .filter(t => t.length >= 30);
+        if (ps.length) return ps;
+        const whole = doc.body.textContent.replace(/\s+/g, " ").trim();
+        return whole.length >= 30 ? [whole] : [];
+    }
+
+    // 确保 articleList 就绪：优先读缓存（秒开），否则抓 RSS 并预提取段落（首屏只抓一次）
+    async function ensureArticles() {
+        if (articleList.length) return;
+        const cached = getCache(currentSource);
+        if (cached && cached.length) {
+            articleList = cached;
+            articleIndex = 0;
+            return;
+        }
+        const list = await fetchArticleList(currentSource);
+        articleList = list.map(a => ({
+            title: a.title, link: a.link, pubDate: a.pubDate, source: a.source,
+            paras: extractParas(a.description || a.title)
+        }));
+        setCache(currentSource, articleList);
+        articleIndex = 0;
+    }
+
     /* ---------- 加载并展示一篇文章 ---------- */
     async function loadArticle() {
         const meta = els.meta();
@@ -70,12 +115,7 @@ const DailyEnglish = (() => {
         footer.innerHTML = "";
 
         try {
-            // 若列表为空，先拉取
-            if (!articleList.length) {
-                articleList = await fetchArticleList(currentSource);
-                articleIndex = 0;
-            }
-
+            await ensureArticles();
             const article = articleList[articleIndex];
             if (!article) throw new Error("没有可用文章");
 
@@ -87,24 +127,24 @@ const DailyEnglish = (() => {
                 <a class="meta-link" href="${article.link}" target="_blank" rel="noopener">查看原文 ↗</a>
             `;
 
-            body.innerHTML = '<p class="loading-text">正在提取正文…</p>';
+            // A：优先用预提取的段落（来自 RSS description，免去跨代理抓整页，秒开）
+            let paras = article.paras || [];
 
-            // 抓取正文段落
-            let paras = [];
-            try {
-                paras = await Api.fetchArticleParagraphs(article.link);
-            } catch (e) {
-                console.warn("正文抓取失败:", e);
+            // description 过短（如 BBC 摘要）才回退抓一次全文补齐，并写回缓存
+            if (paras.join(" ").replace(/\s/g, "").length < 200) {
+                try {
+                    const full = await Api.fetchArticleParagraphs(article.link);
+                    if (full.length) {
+                        paras = full;
+                        article.paras = full;
+                        setCache(currentSource, articleList);
+                    }
+                } catch (e) {
+                    console.warn("正文抓取失败:", e);
+                }
             }
 
-            // 若正文提取失败，用 description 兜底（需剥离 HTML 标签）
-            if (!paras.length) {
-                const desc = article.description || article.title;
-                // description 通常是 HTML 片段，用 DOMParser 提取纯文本
-                const doc = new DOMParser().parseFromString(desc, "text/html");
-                const plain = doc.body.textContent.replace(/\s+/g, " ").trim();
-                paras = plain.length >= 40 ? [plain] : [article.title];
-            }
+            if (!paras.length) paras = [article.title];
 
             renderParagraphs(paras, article);
 

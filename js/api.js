@@ -25,9 +25,9 @@ const Api = (() => {
         return res.text();
     }
 
-    async function fetchJson(rawUrl, { useProxy = false } = {}) {
+    async function fetchJson(rawUrl, { useProxy = false, signal } = {}) {
         const url = useProxy ? proxiedUrl(rawUrl) : rawUrl;
-        const res = await fetch(url);
+        const res = await fetch(url, signal ? { signal } : undefined);
         if (!res.ok) throw new Error(`请求失败 ${res.status}: ${rawUrl}`);
         return res.json();
     }

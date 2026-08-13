@@ -5,12 +5,15 @@
    - 展示城市、温度、天气描述（中文）、图标、体感/湿度/风速/风向/能见度/气压
    - 城市由用户自行添加 / 删除 / 改名（仅存 localStorage，无预设城市）
    - 当前选中城市记忆到 localStorage
-   - 获取失败时展示示例数据
+   - 查询带超时与失败重试，避免代理不稳时界面卡死
+   - 获取失败时展示友好提示
    ===================================================================== */
 
 const Weather = (() => {
     const CITIES_KEY = "dw_weather_cities";   // 用户自定义城市列表 [{id, name}]
     const CITY_KEY = "dw_weather_city";       // 当前选中城市 id
+    const FETCH_TIMEOUT = 9000;               // 直连超时
+    const PROXY_TIMEOUT = 12000;              // 代理重试超时
 
     /* ---------- weatherCode → 中文描述 + emoji ---------- */
     const CODE_MAP = {
@@ -90,19 +93,30 @@ const Weather = (() => {
         return cities.find(c => c.id === currentId) || null;
     }
 
-    /* ---------- 获取天气 ---------- */
+    /* ---------- 获取天气（带超时 + 代理兜底） ---------- */
     async function fetchWeather(cityName) {
-        const url = `https://wttr.in/${encodeURIComponent(cityName)}?format=j1`;
-        // wttr.in 支持 CORS，直接 fetch
+        const target = `https://wttr.in/${encodeURIComponent(cityName)}?format=j1`;
+
+        // 1) 直连（wttr.in 支持 CORS，最快）
+        const c1 = new AbortController();
+        const t1 = setTimeout(() => c1.abort(), FETCH_TIMEOUT);
         try {
-            const res = await fetch(url);
+            const res = await fetch(target, { signal: c1.signal });
             if (res.ok) return await res.json();
         } catch (e) {
-            // 降级到代理
+            // 跨域/超时，走代理
+        } finally {
+            clearTimeout(t1);
         }
-        // 经 CORS 代理重试
-        const data = await Api.fetchJson(`https://wttr.in/${encodeURIComponent(cityName)}?format=j1`, { useProxy: true });
-        return data;
+
+        // 2) 经 CORS 代理重试（也限时，避免卡死）
+        const c2 = new AbortController();
+        const t2 = setTimeout(() => c2.abort(), PROXY_TIMEOUT);
+        try {
+            return await Api.fetchJson(target, { useProxy: true, signal: c2.signal });
+        } finally {
+            clearTimeout(t2);
+        }
     }
 
     /* ---------- 渲染 ---------- */
@@ -138,7 +152,22 @@ const Weather = (() => {
         `;
     }
 
-    /* ---------- 示例数据兜底 ---------- */
+    /* ---------- 友好失败提示（可重试） ---------- */
+    function renderFail(city) {
+        const body = document.getElementById("weatherBody");
+        if (!body) return;
+        body.innerHTML = `
+            <div class="weather-fail">
+                <div class="wf-emoji">🌧️</div>
+                <div class="wf-text">「${escapeHtml(city.name)}」天气暂时取不到</div>
+                <div class="wf-sub">可能是网络波动，或城市名拼写需调整（试试拼音 / 英文）</div>
+                <button class="btn btn-ghost btn-sm" id="weatherRetry" type="button">重试</button>
+            </div>`;
+        const retry = document.getElementById("weatherRetry");
+        if (retry) retry.addEventListener("click", load);
+    }
+
+    /* ---------- 示例数据兜底（结构异常时） ---------- */
     function renderFallback(city) {
         const body = document.getElementById("weatherBody");
         if (!body) return;
@@ -172,8 +201,8 @@ const Weather = (() => {
         bar.innerHTML = cities.map(c => `
             <div class="city-chip ${c.id === currentId ? "active" : ""}" data-id="${c.id}">
                 <span class="chip-name" data-edit="${c.id}">${escapeHtml(c.name)}</span>
-                <button class="chip-edit" data-edit="${c.id}" title="改名" type="button">✎</button>
-                <button class="chip-del" data-del="${c.id}" title="删除" type="button">×</button>
+                <button class="chip-edit" data-edit="${c.id}" title="改名" type="button" aria-label="改名">✎</button>
+                <button class="chip-del" data-del="${c.id}" title="删除" type="button" aria-label="删除">×</button>
             </div>
         `).join("");
 
@@ -200,7 +229,7 @@ const Weather = (() => {
         });
     }
 
-    /* ---------- 改名 ---------- */
+    /* ---------- 改名（行内编辑） ---------- */
     function startEdit(id) {
         const chip = document.querySelector(`.city-chip[data-id="${id}"]`);
         if (!chip) return;
@@ -228,7 +257,7 @@ const Weather = (() => {
         const input = document.getElementById("weatherAddInput");
         if (!input) return;
         const name = input.value.trim();
-        if (!name) return;
+        if (!name) { input.focus(); return; }
 
         // 查重（忽略大小写）
         if (cities.find(c => c.name.toLowerCase() === name.toLowerCase())) {
@@ -250,6 +279,7 @@ const Weather = (() => {
         }
         renderCityBar();
         Api.showToast(`已添加 ${name}`, "success");
+        input.focus(); // 方便连续添加
         if (first) load();
     }
 
@@ -269,7 +299,7 @@ const Weather = (() => {
         if (currentId) load();
         else {
             const body = document.getElementById("weatherBody");
-            if (body) body.innerHTML = '<p class="loading-text">添加城市后可查看天气</p>';
+            if (body) body.innerHTML = '<p class="loading-text">在下方添加城市，即可查看天气 ☁️</p>';
         }
         Api.showToast(`已删除 ${removed.name}`, "info");
     }
@@ -281,7 +311,6 @@ const Weather = (() => {
         c.name = newName;
         saveCities(cities);
         renderCityBar();
-        // 若改的是当前城市，重新拉天气
         if (currentId === id) load();
         Api.showToast("已更新城市名", "success");
     }
@@ -301,16 +330,16 @@ const Weather = (() => {
         if (!body) return;
         const city = currentCity();
         if (!city) {
-            body.innerHTML = '<p class="loading-text">添加城市后可查看天气</p>';
+            body.innerHTML = '<p class="loading-text">在下方添加城市，即可查看天气 ☁️</p>';
             return;
         }
-        body.innerHTML = '<p class="loading-text">天气加载中…</p>';
+        body.innerHTML = `<p class="loading-text">正在获取 ${escapeHtml(city.name)} 的天气…</p>`;
         try {
             const data = await fetchWeather(city.name);
             render(data, city);
         } catch (e) {
             console.warn("天气获取失败:", e);
-            renderFallback(city);
+            renderFail(city);
         }
     }
 
@@ -318,7 +347,15 @@ const Weather = (() => {
     function init() {
         const input = document.getElementById("weatherAddInput");
         const addBtn = document.getElementById("weatherAddBtn");
-        if (input) input.addEventListener("keydown", e => { if (e.key === "Enter") addCity(); });
+        let composing = false;
+        if (input) {
+            // 中文输入法组合期间不误触发
+            input.addEventListener("compositionstart", () => composing = true);
+            input.addEventListener("compositionend", () => composing = false);
+            input.addEventListener("keydown", e => {
+                if (e.key === "Enter" && !composing) { e.preventDefault(); addCity(); }
+            });
+        }
         if (addBtn) addBtn.addEventListener("click", addCity);
 
         renderCityBar();

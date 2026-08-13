@@ -1162,58 +1162,75 @@ button { font-family: inherit; cursor: pointer; }
 .weather-cities {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 14px 18px 4px;
+    gap: 7px;
+    padding: 16px 18px 2px;
 }
 .weather-empty {
     width: 100%;
     font-size: 12.5px;
     color: var(--text-faint);
-    padding: 4px 2px;
+    text-align: center;
+    padding: 6px 2px;
 }
 .city-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 5px 6px 5px 11px;
+    gap: 5px;
+    padding: 6px 8px 6px 13px;
     background: var(--bg-soft);
     border: 1px solid var(--border-soft);
     border-radius: 999px;
     font-size: 13px;
     color: var(--text-soft);
     cursor: pointer;
-    transition: all .25s var(--ease);
+    transition: transform .18s var(--ease), border-color .2s var(--ease), background .2s var(--ease), color .2s var(--ease);
     user-select: none;
 }
-.city-chip:hover { border-color: var(--accent); color: var(--text); }
+.city-chip:hover {
+    border-color: var(--lavender);
+    color: var(--text);
+    transform: translateY(-1px);
+}
 .city-chip.active {
-    background: var(--accent);
-    border-color: var(--accent);
+    background: var(--lavender);
+    border-color: var(--lavender);
     color: #fff;
+    box-shadow: 0 2px 8px rgba(184,168,212,.4);
 }
 .city-chip.active .chip-edit,
-.city-chip.active .chip-del { color: rgba(255,255,255,.85); }
-.chip-name { line-height: 1.2; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.city-chip.active .chip-del { color: rgba(255,255,255,.9); }
+.chip-name {
+    line-height: 1.2;
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .chip-edit, .chip-del {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
     border: none;
     background: transparent;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1;
-    padding: 2px 4px;
     border-radius: 50%;
     color: var(--text-faint);
     transition: all .2s var(--ease);
+    flex: 0 0 auto;
 }
-.chip-edit:hover { color: var(--accent); background: rgba(127,127,127,.12); }
+.chip-edit:hover { color: var(--lavender); background: rgba(127,127,127,.16); }
 .chip-del:hover { color: #fff; background: #e05c5c; }
-.city-chip.active .chip-del:hover { background: rgba(255,255,255,.3); color: #fff; }
+.city-chip.active .chip-del:hover { background: rgba(255,255,255,.32); color: #fff; }
 .chip-edit-input {
     font-size: 13px;
-    border: 1px solid var(--accent);
+    border: 1px solid var(--lavender);
     border-radius: 6px;
-    padding: 3px 6px;
-    width: 96px;
+    padding: 4px 7px;
+    width: 100px;
     outline: none;
     color: var(--text);
     background: var(--bg-card);
@@ -1221,20 +1238,51 @@ button { font-family: inherit; cursor: pointer; }
 .weather-add {
     display: flex;
     gap: 8px;
-    padding: 10px 18px 18px;
+    padding: 12px 18px 18px;
 }
 .weather-input {
     flex: 1 1 auto;
     min-width: 0;
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-xs, 8px);
-    padding: 8px 12px;
+    padding: 9px 13px;
     font-size: 13px;
     color: var(--text);
     background: var(--bg-card);
-    transition: border-color .25s var(--ease);
+    transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
 }
-.weather-input:focus { outline: none; border-color: var(--accent); }
+.weather-input::placeholder { color: var(--text-faint); }
+.weather-input:focus {
+    outline: none;
+    border-color: var(--lavender);
+    box-shadow: 0 0 0 3px rgba(184,168,212,.18);
+}
+/* 添加按钮：淡紫强调 */
+.weather-add .btn-ghost {
+    border-color: var(--lavender);
+    color: var(--lavender-dark);
+    background: var(--lavender-soft);
+    flex: 0 0 auto;
+}
+.weather-add .btn-ghost:hover {
+    background: var(--lavender);
+    color: #fff;
+    border-color: var(--lavender);
+    transform: translateY(-1px);
+}
+/* 天气获取失败提示 */
+.weather-fail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 12px;
+    text-align: center;
+}
+.weather-fail .wf-emoji { font-size: 38px; line-height: 1; }
+.weather-fail .wf-text { font-size: 14px; color: var(--text); }
+.weather-fail .wf-sub { font-size: 12px; color: var(--text-faint); max-width: 240px; line-height: 1.5; }
+.weather-fail .btn { margin-top: 4px; }
 
 .weather-body {
     padding: 24px;
