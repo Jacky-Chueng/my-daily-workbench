@@ -82,26 +82,49 @@ window.APP_CONFIG = {
     },
 
     /* =================================================================
-       五、每日国际新闻：中文 RSS 源
+       五、每日要闻：中文 RSS 源（国内 + 国际混合 · 按重要性排序）
        ✅ 无需修改。通过 rss2json 服务转换为 JSON（支持 CORS）。
-       如需新增新闻源，在此添加一条即可，页面下拉框会自动出现。
+       每个分组都是「聚合源」：同时抓取多个 feed，去重后按编辑重要性
+       交错混合（国内/国际均衡），取前 newsCount 则。
+       如需新增新闻源，在对应分组的 feeds 数组里加一条即可。
        ================================================================= */
     newsSources: {
-        chinanews: {
-            name: "中新网·即时",
-            feed: "http://www.chinanews.com.cn/rss/scroll-news.xml"
+        // 综合要闻（默认）：国内 + 国际头条混合，按重要性取前 8 则
+        headline: {
+            name: "综合要闻",
+            aggregate: true,
+            feeds: [
+                { name: "新华网·要闻", feed: "http://www.xinhuanet.com/politics/news_politics.xml", region: "domestic" },
+                { name: "人民网·国内", feed: "http://www.people.com.cn/rss/politics.xml", region: "domestic" },
+                { name: "中国新闻网",   feed: "http://www.chinanews.com.cn/rss/scroll-news.xml", region: "domestic" },
+                { name: "新华网·国际", feed: "http://www.xinhuanet.com/world/news_world.xml", region: "international" },
+                { name: "中国新闻网·国际", feed: "http://www.chinanews.com.cn/rss/world.xml", region: "international" },
+                { name: "BBC中文",    feed: "http://www.bbc.co.uk/zhongwen/simp/index.xml", region: "international" }
+            ]
         },
-        xinhua: {
-            name: "新华网·国际",
-            feed: "http://www.xinhuanet.com/world/news_world.xml"
+        // 国内
+        domestic: {
+            name: "国内",
+            aggregate: true,
+            feeds: [
+                { name: "新华网·要闻", feed: "http://www.xinhuanet.com/politics/news_politics.xml", region: "domestic" },
+                { name: "人民网·国内", feed: "http://www.people.com.cn/rss/politics.xml", region: "domestic" },
+                { name: "中国新闻网",   feed: "http://www.chinanews.com.cn/rss/scroll-news.xml", region: "domestic" }
+            ]
         },
-        people: {
-            name: "人民网·国际",
-            feed: "http://www.people.com.cn/rss/world.xml"
+        // 国际
+        international: {
+            name: "国际",
+            aggregate: true,
+            feeds: [
+                { name: "新华网·国际", feed: "http://www.xinhuanet.com/world/news_world.xml", region: "international" },
+                { name: "中国新闻网·国际", feed: "http://www.chinanews.com.cn/rss/world.xml", region: "international" },
+                { name: "BBC中文",    feed: "http://www.bbc.co.uk/zhongwen/simp/index.xml", region: "international" }
+            ]
         }
     },
     rss2json: "https://api.rss2json.com/v1/api.json?rss_url=",
-    newsCount: 6,
+    newsCount: 8,
 
     /* =================================================================
        六、今日天气

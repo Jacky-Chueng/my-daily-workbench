@@ -835,10 +835,29 @@ button { font-family: inherit; cursor: pointer; }
 .news-item {
     padding: 13px 0;
     border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
     transition: all .35s var(--ease);
 }
 .news-item:last-child { border-bottom: none; }
 .news-item:hover { padding-left: 6px; }
+
+.news-rank {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, var(--lavender) 0%, var(--lavender-dark) 100%);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.news-body { flex: 1; min-width: 0; }
 
 .news-item a {
     display: block;

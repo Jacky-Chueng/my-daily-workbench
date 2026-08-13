@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的每日学习工作台</title>
-    <meta name="description" content="每日英语学习、黄历、国际新闻、日程记录与心情记录一站式工作台">
+    <meta name="description" content="每日英语学习、黄历、每日要闻、待办事项与心情记录一站式工作台">
     <link rel="stylesheet" href="css/styles.css">
     <script src="js/config.js"></script>
 </head>
@@ -94,7 +94,7 @@
                 </button>
                 <button class="nav-item" data-page="news">
                     <span class="nav-icon">&#127757;</span>
-                    <span class="nav-label">国际新闻</span>
+                    <span class="nav-label">每日要闻</span>
                 </button>
                 <button class="nav-item" data-page="todo">
                     <span class="nav-icon">&#9989;</span>
@@ -230,11 +230,11 @@
             <section class="page" id="page-news">
                 <article class="card card-news" id="newsCard">
                     <div class="card-head">
-                        <h2><span class="emoji">&#127757;</span> 每日国际新闻</h2>
-                        <select id="newsSource" class="select-source" title="切换新闻源">
-                            <option value="chinanews">中新网·即时</option>
-                            <option value="xinhua">新华网·国际</option>
-                            <option value="people">人民网·国际</option>
+                        <h2><span class="emoji">&#127757;</span> 每日要闻</h2>
+                        <select id="newsSource" class="select-source" title="切换新闻范围">
+                            <option value="headline">综合要闻</option>
+                            <option value="domestic">国内</option>
+                            <option value="international">国际</option>
                         </select>
                     </div>
                     <ul class="news-list" id="newsList">
