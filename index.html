@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的每日学习工作台</title>
+    <meta name="description" content="每日英语学习、黄历、国际新闻、日程记录与心情记录一站式工作台">
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="js/config.js"></script>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="topbar-left">
+                <button id="menuToggle" class="icon-btn menu-toggle" title="菜单" aria-label="菜单">&#9776;</button>
+                <span class="topbar-logo">&#128218;</span>
+                <span class="topbar-title">学习工作台</span>
+            </div>
+            <div class="topbar-actions">
+                <select id="articleSource" class="select-source" title="切换英语文章来源">
+                    <option value="guardian">The Guardian</option>
+                    <option value="bbc">BBC News</option>
+                    <option value="reuters">Reuters</option>
+                </select>
+                <button id="themeToggle" class="icon-btn" title="切换浅色/深色主题" aria-label="切换主题">
+                    <span class="theme-icon-light">&#127769;</span>
+                    <span class="theme-icon-dark">&#9728;&#65039;</span>
+                </button>
+                <button id="refreshAll" class="icon-btn" title="刷新全部数据" aria-label="刷新">&#128260;</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主区域：侧边栏 + 内容 -->
+    <div class="app-shell">
+
+        <!-- 左侧栏 -->
+        <aside class="sidebar">
+            <!-- 用户头像与问候 -->
+            <section class="profile">
+                <div class="avatar" id="userAvatar">K</div>
+                <div class="profile-info">
+                    <div class="profile-greet">Hello, Kian <span class="wave">&#128075;</span></div>
+                    <div class="profile-sub">今天的你也辛苦了</div>
+                </div>
+            </section>
+
+            <!-- 紫罗兰鼓励卡 -->
+            <section class="quote-card">
+                <div class="quote-zh">你可以允许的，<br>终将发生。</div>
+                <div class="quote-en">— What you permit is what eventually allows.</div>
+            </section>
+
+            <!-- 状态概览 -->
+            <section class="stats">
+                <div class="stat">
+                    <div class="stat-icon stat-icon-1">&#128214;</div>
+                    <div class="stat-info">
+                        <div class="stat-value"><span id="statVocab">0</span> <small>词</small></div>
+                        <div class="stat-label">生词量</div>
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="stat-icon stat-icon-2">&#9989;</div>
+                    <div class="stat-info">
+                        <div class="stat-value"><span id="statTodoDone">0</span><small>/</small><span id="statTodoTotal">0</span></div>
+                        <div class="stat-label">待办事项</div>
+                    </div>
+                </div>
+                <div class="stat">
+                    <div class="stat-icon stat-icon-3">&#128578;</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="statMood">—</div>
+                        <div class="stat-label">今日心情</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 导航 -->
+            <nav class="nav">
+                <div class="nav-head">功能模块</div>
+                <button class="nav-item active" data-page="home">
+                    <span class="nav-icon">&#127968;</span>
+                    <span class="nav-label">首页</span>
+                </button>
+                <button class="nav-item" data-page="english">
+                    <span class="nav-icon">&#128214;</span>
+                    <span class="nav-label">每日英语</span>
+                </button>
+                <button class="nav-item" data-page="vocab">
+                    <span class="nav-icon">&#128451;&#65039;</span>
+                    <span class="nav-label">生词库</span>
+                </button>
+                <button class="nav-item" data-page="news">
+                    <span class="nav-icon">&#127757;</span>
+                    <span class="nav-label">国际新闻</span>
+                </button>
+                <button class="nav-item" data-page="todo">
+                    <span class="nav-icon">&#9989;</span>
+                    <span class="nav-label">待办事项</span>
+                </button>
+                <button class="nav-item" data-page="mood">
+                    <span class="nav-icon">&#128578;</span>
+                    <span class="nav-label">每日心情</span>
+                </button>
+            </nav>
+
+            <!-- 侧边栏底部 -->
+            <footer class="sidebar-foot">
+                <div class="sidebar-date" id="sidebarDate">—</div>
+                <div class="data-io-buttons">
+                    <button id="btnExportData" class="btn btn-ghost btn-sm btn-block">📤 导出数据</button>
+                    <button id="btnImportData" class="btn btn-ghost btn-sm btn-block">📥 导入数据</button>
+                    <input type="file" id="importFileInput" accept=".json" class="hidden">
+                </div>
+                <div class="sidebar-quote">"Stay curious, stay humble."</div>
+            </footer>
+        </aside>
+
+        <!-- 移动端抽屉遮罩 -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+        <!-- 主内容区 -->
+        <main class="content">
+
+            <!-- 页面：首页（天气 + 黄历） -->
+            <section class="page active" id="page-home">
+                <div class="home-grid">
+                    <!-- 天气卡 -->
+                    <article class="card card-weather">
+                        <div class="card-head">
+                            <h2><span class="emoji">&#127780;&#65039;</span> 今日天气</h2>
+                            <select id="weatherCity" class="select-source" title="切换城市">
+                                <option value="Beijing">北京</option>
+                                <option value="Shanghai">上海</option>
+                                <option value="Guangzhou">广州</option>
+                                <option value="Shenzhen">深圳</option>
+                                <option value="Hangzhou">杭州</option>
+                                <option value="Chengdu">成都</option>
+                                <option value="Wuhan">武汉</option>
+                                <option value="Nanjing">南京</option>
+                                <option value="Xian">西安</option>
+                                <option value="Chongqing">重庆</option>
+                            </select>
+                        </div>
+                        <div class="weather-body" id="weatherBody">
+                            <p class="loading-text">天气加载中…</p>
+                        </div>
+                    </article>
+
+                    <!-- 黄历卡 -->
+                    <article class="card card-almanac" id="almanacCard">
+                        <div class="card-head">
+                            <h2><span class="emoji">&#128197;</span> 今日黄历</h2>
+                        </div>
+                        <div class="almanac-body" id="almanacBody">
+                            <p class="loading-text">黄历加载中…</p>
+                        </div>
+                    </article>
+
+                    <!-- 首页待办清单 -->
+                    <article class="card card-home-todo">
+                        <div class="card-head">
+                            <h2><span class="emoji">&#9989;</span> 待办清单 <span class="count-badge" id="homeTodoCount">0</span></h2>
+                            <a href="#" class="link-more" data-goto="todo">全部 →</a>
+                        </div>
+                        <form class="todo-form" id="homeTodoForm">
+                            <input type="text" id="homeTodoInput" class="input" placeholder="添加待办，回车确认" maxlength="100">
+                            <button type="submit" class="btn btn-primary">添加</button>
+                        </form>
+                        <ul class="todo-list" id="homeTodoList"></ul>
+                    </article>
+
+                    <!-- 首页生词复习 -->
+                    <article class="card card-home-vocab">
+                        <div class="card-head">
+                            <h2><span class="emoji">&#128451;&#65039;</span> 生词复习</h2>
+                            <button id="refreshVocabCard" class="btn btn-ghost btn-sm">换一批</button>
+                        </div>
+                        <div class="vocab-review" id="vocabReview">
+                            <p class="loading-text">加载中…</p>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- 页面：每日英语 -->
+            <section class="page" id="page-english">
+                <article class="card card-english" id="englishCard">
+                    <div class="card-head">
+                        <h2><span class="emoji">&#128214;</span> 每日英语</h2>
+                        <div class="card-tools">
+                            <button id="nextArticle" class="btn btn-ghost" title="换一篇">换一篇</button>
+                            <button id="translateAll" class="btn btn-ghost" title="翻译全文">翻译全文</button>
+                        </div>
+                    </div>
+                    <div class="english-meta" id="englishMeta">
+                        <span class="loading-text">正在获取今日文章…</span>
+                    </div>
+                    <div class="article-body" id="articleBody">
+                        <p class="loading-text">文章加载中，请稍候…</p>
+                    </div>
+                    <footer class="article-footer" id="articleFooter"></footer>
+                </article>
+            </section>
+
+            <!-- 页面：生词库 -->
+            <section class="page" id="page-vocab">
+                <article class="card card-vocab" id="vocabCard">
+                    <div class="card-head">
+                        <h2><span class="emoji">&#128451;&#65039;</span> 生词库 <span class="count-badge" id="vocabCount">0</span></h2>
+                        <div class="card-tools">
+                            <button id="exportTxt" class="btn btn-ghost btn-sm" title="导出为 TXT">导出 TXT</button>
+                            <button id="exportJson" class="btn btn-ghost btn-sm" title="导出为 JSON">导出 JSON</button>
+                            <button id="clearVocab" class="btn btn-danger-ghost btn-sm" title="清空生词库">清空</button>
+                        </div>
+                    </div>
+                    <div id="selectionBar" class="selection-bar hidden">
+                        <span id="selectionWord" class="selection-word"></span>
+                        <button id="addWordBtn" class="btn btn-primary btn-sm">添加到生词库</button>
+                    </div>
+                    <ul class="vocab-list" id="vocabList">
+                        <li class="empty-hint">暂无生词。在每日英语文章中选中单词即可添加。</li>
+                    </ul>
+                </article>
+            </section>
+
+            <!-- 页面：国际新闻 -->
+            <section class="page" id="page-news">
+                <article class="card card-news" id="newsCard">
+                    <div class="card-head">
+                        <h2><span class="emoji">&#127757;</span> 每日国际新闻</h2>
+                        <select id="newsSource" class="select-source" title="切换新闻源">
+                            <option value="chinanews">中新网·即时</option>
+                            <option value="xinhua">新华网·国际</option>
+                            <option value="people">人民网·国际</option>
+                        </select>
+                    </div>
+                    <ul class="news-list" id="newsList">
+                        <li class="loading-text">新闻加载中…</li>
+                    </ul>
+                </article>
+            </section>
+
+            <!-- 页面：今日日程 -->
+            <section class="page" id="page-todo">
+                <article class="card card-todo" id="todoCard">
+                    <div class="card-head">
+                        <h2><span class="emoji">&#9989;</span> 待办事项 <span class="count-badge" id="todoCount">0</span></h2>
+                    </div>
+                    <form class="todo-form" id="todoForm">
+                        <input type="text" id="todoInput" class="input" placeholder="添加一条今日待办，回车确认" maxlength="100">
+                        <button type="submit" class="btn btn-primary">添加</button>
+                    </form>
+                    <ul class="todo-list" id="todoList"></ul>
+                </article>
+            </section>
+
+            <!-- 页面：每日心情 -->
+            <section class="page" id="page-mood">
+                <article class="card card-mood" id="moodCard">
+                    <div class="card-head">
+                        <h2><span class="emoji">&#128578;</span> 每日心情</h2>
+                    </div>
+                    <div class="mood-picker" id="moodPicker">
+                        <button class="mood-btn" data-mood="&#128522;" data-label="开心">&#128522;</button>
+                        <button class="mood-btn" data-mood="&#128528;" data-label="平静">&#128528;</button>
+                        <button class="mood-btn" data-mood="&#128546;" data-label="难过">&#128546;</button>
+                        <button class="mood-btn" data-mood="&#128545;" data-label="生气">&#128545;</button>
+                        <button class="mood-btn" data-mood="&#128564;" data-label="疲惫">&#128564;</button>
+                        <button class="mood-btn" data-mood="&#129392;" data-label="幸福">&#129392;</button>
+                    </div>
+                    <textarea id="moodNote" class="textarea" placeholder="今天想说点什么？（可选）" maxlength="200"></textarea>
+                    <button id="saveMood" class="btn btn-primary btn-block">保存今日心情</button>
+                    <div class="mood-history-head">
+                        <h3>历史记录</h3>
+                    </div>
+                    <ul class="mood-history" id="moodHistory"></ul>
+                </article>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- 全局提示 Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- 模块脚本（顺序加载） -->
+    <script src="js/api.js"></script>
+    <script src="js/vocabulary.js"></script>
+    <script src="js/daily-english.js"></script>
+    <script src="js/almanac.js"></script>
+    <script src="js/weather.js"></script>
+    <script src="js/news.js"></script>
+    <script src="js/todo.js"></script>
+    <script src="js/mood.js"></script>
+    <script src="js/home.js"></script>
+    <script src="js/data-io.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
