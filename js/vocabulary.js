@@ -188,6 +188,9 @@ const Vocab = (() => {
         render();
         initSelectionListener();
 
+        // 云端同步完成后（其他设备加了生词）刷新列表
+        document.addEventListener("dw:remoteSynced", render);
+
         document.getElementById("exportTxt").addEventListener("click", exportTxt);
         document.getElementById("exportJson").addEventListener("click", exportJson);
         document.getElementById("clearVocab").addEventListener("click", clearAll);

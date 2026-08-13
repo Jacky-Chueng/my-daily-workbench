@@ -171,6 +171,9 @@ const Mood = (() => {
 
         loadToday();
         renderHistory();
+
+        // 云端同步完成后（其他设备改了数据）刷新历史列表
+        document.addEventListener("dw:remoteSynced", renderHistory);
     }
 
     function refresh() {

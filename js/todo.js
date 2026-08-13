@@ -196,6 +196,10 @@ const Todo = (() => {
                 Api.showToast("已添加待办", "success");
             });
         }
+        // 云端同步完成后（其他设备改了数据）重新渲染本页
+        document.addEventListener("dw:remoteSynced", () => {
+            if (!editingId) render();   // 正在行内编辑时不打断
+        });
         render();
     }
 

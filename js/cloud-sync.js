@@ -61,7 +61,12 @@ const CloudSync = (() => {
         });
         applyingRemote = false;
         // 通知各模块重渲染（此时 applyingRemote 已复位，不会触发上传）
-        if (changed) window.dispatchEvent(new CustomEvent("dw:dataChanged"));
+        if (changed) {
+            window.dispatchEvent(new CustomEvent("dw:dataChanged"));
+            // 专用事件：通知「待办/心情/生词」页面从 localStorage 重新渲染
+            // （避免本地编辑时因 dw:dataChanged 而误重绘、打断输入）
+            window.dispatchEvent(new CustomEvent("dw:remoteSynced"));
+        }
     }
 
     /* ---------- 合并策略 ---------- */
