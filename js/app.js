@@ -199,6 +199,9 @@
         // 拦截原始模块的数据变更，自动刷新侧边栏
         // 利用自定义事件实现：各模块在 save 后 dispatch 一个事件
         document.addEventListener("dw:dataChanged", SidebarStats.refresh);
+
+        // 云同步（Supabase）放在最后：先让本地模块渲染，再拉取云端覆盖
+        CloudSync.init();
     }
 
     if (document.readyState === "loading") {

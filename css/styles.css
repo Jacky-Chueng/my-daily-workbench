@@ -463,6 +463,38 @@ button { font-family: inherit; cursor: pointer; }
     letter-spacing: .03em;
 }
 
+/* 云同步状态条 */
+.sync-status {
+    font-size: 11px;
+    letter-spacing: .03em;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 8px;
+    cursor: default;
+    transition: all .3s var(--ease);
+    user-select: none;
+}
+.sync-status.sync-ok      { color: var(--primary); }
+.sync-status.sync-off     { color: var(--text-faint); }
+.sync-status.sync-syncing { color: var(--lavender); }
+.sync-status.sync-error   { color: var(--danger); cursor: pointer; }
+.sync-status.sync-syncing::after {
+    content: "";
+    display: inline-block;
+    width: 9px; height: 9px;
+    margin-left: 5px;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    vertical-align: -1px;
+    animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    .sync-status.sync-syncing::after { animation: none; }
+}
+[data-theme="dark"] .sync-status.sync-ok { color: var(--primary-soft); }
+
 /* 抽屉遮罩 */
 .sidebar-backdrop {
     display: none;
