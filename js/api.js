@@ -169,12 +169,12 @@ const Api = (() => {
             try {
                 localStorage.setItem(key, JSON.stringify(value));
                 // 通知侧边栏统计等订阅者更新
-                document.dispatchEvent(new CustomEvent("dw:dataChanged", { detail: { key, value } }));
+                document.dispatchEvent(new CustomEvent("dw:dataChanged", { detail: { key, value }, bubbles: true }));
             } catch (e) { /* 配额满 */ }
         },
         remove(key) {
             localStorage.removeItem(key);
-            document.dispatchEvent(new CustomEvent("dw:dataChanged", { detail: { key } }));
+            document.dispatchEvent(new CustomEvent("dw:dataChanged", { detail: { key }, bubbles: true }));
         }
     };
 
