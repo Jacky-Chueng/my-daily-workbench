@@ -69,7 +69,43 @@ push 后约 30 秒~2 分钟自动重新部署，硬刷新（`Ctrl+Shift+R`）即
 
 ---
 
-## 四、本地预览（不依赖线上）
+## 四、SSH 免密推送（推荐，一次性配置）
+
+配置一次后，这台机器 `git push` 永远不再需要令牌/密码。SSH 密钥是**按机器生成**的，所以"在哪台机器 push，就在哪台机器生成"。
+
+### 1. 生成密钥（每台机器跑一次）
+```bash
+git config --global user.name "Jacky-Chueng"
+git config --global user.email "602731824@qq.com"
+ssh-keygen -t ed25519 -C "602731824@qq.com" -f ~/.ssh/id_ed25519 -N ""
+cat ~/.ssh/id_ed25519.pub   # 把输出的整行公钥复制下来
+```
+
+### 2. 把公钥加到 GitHub
+GitHub → 头像 → **Settings** → 左侧底 **SSH and GPG keys** → **New SSH key**
+- Title：填便于识别的名字（如 `workbuddy-pc`）
+- Key type：保持 Authentication Key
+- Key：粘贴上一步 `cat` 出来的那行 `ssh-ed25519 AAAA...`
+- 点 **Add SSH key**
+
+### 3. 首次连接信任 GitHub 主机密钥
+```bash
+ssh -o StrictHostKeyChecking=accept-new -T git@github.com
+# 看到 "Hi Jacky-Chueng! You've successfully authenticated" 即成功
+```
+
+### 4. 把仓库远程地址改成 SSH（已 clone 过的仓库才需要）
+```bash
+git remote set-url origin git@github.com:Jacky-Chueng/my-daily-workbench.git
+git remote -v   # 确认显示 git@github.com:... 即成功
+```
+之后 `git clone` 也直接用 SSH 地址：`git clone git@github.com:Jacky-Chueng/my-daily-workbench.git`
+
+> 多台电脑：每台重新生成一对密钥、各往 GitHub 加一条 SSH key 即可，互不冲突。
+
+---
+
+## 五、本地预览（不依赖线上）
 ```bash
 cd my-daily-workbench
 python -m http.server 8080
@@ -86,5 +122,5 @@ A：WorkBuddy 编辑的是本地文件，它不托管你的网站。线上文件
 **Q：新电脑 push 提示 403 / 要密码但密码不对？**
 A：GitHub 自 2021 年起禁用账号密码登录 git，必须用令牌（或 SSH）。见上文「准备环境」。
 
-**Q：数据怎么不在多台电脑间自动同步？**
-A：localStorage 是浏览器私有的，WorkBuddy 无法跨设备读取。当前用「导出/导入 JSON」手动同步；若要自动同步需接入后端（未来可扩展）。
+**Q：数据怎么在多台电脑/手机间自动同步？**
+A：本项目已接入 **Supabase 云同步**（见 `SUPABASE_SETUP.md`）。生词/待办/心情会自动上传到云端，任意设备打开线上网址即自动拉取、一端改动另一端约 1 秒刷新。「导出/导入 JSON」作为离线备份仍可用，但日常已无需手动搬运。
