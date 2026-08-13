@@ -132,18 +132,11 @@
                     <article class="card card-weather">
                         <div class="card-head">
                             <h2><span class="emoji">&#127780;&#65039;</span> 今日天气</h2>
-                            <select id="weatherCity" class="select-source" title="切换城市">
-                                <option value="Beijing">北京</option>
-                                <option value="Shanghai">上海</option>
-                                <option value="Guangzhou">广州</option>
-                                <option value="Shenzhen">深圳</option>
-                                <option value="Hangzhou">杭州</option>
-                                <option value="Chengdu">成都</option>
-                                <option value="Wuhan">武汉</option>
-                                <option value="Nanjing">南京</option>
-                                <option value="Xian">西安</option>
-                                <option value="Chongqing">重庆</option>
-                            </select>
+                        </div>
+                        <div class="weather-cities" id="weatherCityBar"></div>
+                        <div class="weather-add">
+                            <input type="text" id="weatherAddInput" class="weather-input" placeholder="添加城市，如 北京 / Tokyo" maxlength="30" />
+                            <button id="weatherAddBtn" class="btn btn-ghost btn-sm" type="button">添加</button>
                         </div>
                         <div class="weather-body" id="weatherBody">
                             <p class="loading-text">天气加载中…</p>

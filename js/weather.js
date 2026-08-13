@@ -3,15 +3,14 @@
    ---------------------------------------------------------------------
    使用 wttr.in 免费天气服务（无需 API Key，支持 CORS）。
    - 展示城市、温度、天气描述（中文）、图标、体感/湿度/风速/风向/能见度/气压
-   - 支持城市切换（下拉框）
-   - 当前城市记忆到 localStorage
+   - 城市由用户自行添加 / 删除 / 改名（仅存 localStorage，无预设城市）
+   - 当前选中城市记忆到 localStorage
    - 获取失败时展示示例数据
    ===================================================================== */
 
 const Weather = (() => {
-    const CFG = window.APP_CONFIG.weather;
-    const CITY_KEY = "dw_weather_city";
-    let currentCity = localStorage.getItem(CITY_KEY) || CFG.defaultCity;
+    const CITIES_KEY = "dw_weather_cities";   // 用户自定义城市列表 [{id, name}]
+    const CITY_KEY = "dw_weather_city";       // 当前选中城市 id
 
     /* ---------- weatherCode → 中文描述 + emoji ---------- */
     const CODE_MAP = {
@@ -69,9 +68,31 @@ const Weather = (() => {
         return CODE_MAP[code] || { zh: "未知", emoji: "🌡️" };
     }
 
+    /* ---------- 城市列表读写 ---------- */
+    function loadCities() {
+        const list = Api.store.get(CITIES_KEY, []) || [];
+        return Array.isArray(list) ? list : [];
+    }
+    function saveCities(list) {
+        Api.store.set(CITIES_KEY, list);
+    }
+
+    let cities = loadCities();
+    let currentId = localStorage.getItem(CITY_KEY) || "";
+
+    // 修正：当前选中若已不在列表中，回退到第一个
+    if (cities.length && !cities.find(c => c.id === currentId)) {
+        currentId = cities[0].id;
+        localStorage.setItem(CITY_KEY, currentId);
+    }
+
+    function currentCity() {
+        return cities.find(c => c.id === currentId) || null;
+    }
+
     /* ---------- 获取天气 ---------- */
-    async function fetchWeather(city) {
-        const url = `https://wttr.in/${encodeURIComponent(city)}?format=j1`;
+    async function fetchWeather(cityName) {
+        const url = `https://wttr.in/${encodeURIComponent(cityName)}?format=j1`;
         // wttr.in 支持 CORS，直接 fetch
         try {
             const res = await fetch(url);
@@ -80,23 +101,19 @@ const Weather = (() => {
             // 降级到代理
         }
         // 经 CORS 代理重试
-        const data = await Api.fetchJson(`https://wttr.in/${encodeURIComponent(city)}?format=j1`, { useProxy: true });
+        const data = await Api.fetchJson(`https://wttr.in/${encodeURIComponent(cityName)}?format=j1`, { useProxy: true });
         return data;
     }
 
     /* ---------- 渲染 ---------- */
-    function render(data) {
+    function render(data, city) {
         const cur = data.current_condition && data.current_condition[0];
-        if (!cur) { renderFallback(); return; }
+        if (!cur) { renderFallback(city); return; }
 
         const area = data.nearest_area && data.nearest_area[0];
-        const areaName = area ? area.areaName[0].value : currentCity;
+        const areaName = area ? area.areaName[0].value : city.name;
         const code = parseInt(cur.weatherCode);
         const info = infoByCode(code);
-
-        // 城市中文名（从配置查找）
-        const cityCfg = CFG.cities.find(c => c.value.toLowerCase() === currentCity.toLowerCase());
-        const cityName = cityCfg ? cityCfg.label : areaName;
 
         const body = document.getElementById("weatherBody");
         if (!body) return;
@@ -109,7 +126,7 @@ const Weather = (() => {
                 </div>
                 <div class="weather-desc">${info.zh}</div>
             </div>
-            <div class="weather-city">${escapeHtml(cityName)}</div>
+            <div class="weather-city">${escapeHtml(city.name)}</div>
             <div class="weather-details">
                 <div class="wd-item"><span class="wd-label">体感</span><span class="wd-value">${cur.FeelsLikeC}°C</span></div>
                 <div class="wd-item"><span class="wd-label">湿度</span><span class="wd-value">${cur.humidity}%</span></div>
@@ -122,18 +139,17 @@ const Weather = (() => {
     }
 
     /* ---------- 示例数据兜底 ---------- */
-    function renderFallback() {
+    function renderFallback(city) {
         const body = document.getElementById("weatherBody");
         if (!body) return;
-        const cityCfg = CFG.cities.find(c => c.value.toLowerCase() === currentCity.toLowerCase());
-        const cityName = cityCfg ? cityCfg.label : currentCity;
+        const name = city ? city.name : "未知城市";
         body.innerHTML = `
             <div class="weather-main">
                 <div class="weather-icon">🌤️</div>
                 <div class="weather-temp"><span class="temp-num">25</span><span class="temp-unit">°C</span></div>
                 <div class="weather-desc">晴间多云</div>
             </div>
-            <div class="weather-city">${escapeHtml(cityName)}（示例数据）</div>
+            <div class="weather-city">${escapeHtml(name)}（示例数据）</div>
             <div class="weather-details">
                 <div class="wd-item"><span class="wd-label">体感</span><span class="wd-value">26°C</span></div>
                 <div class="wd-item"><span class="wd-label">湿度</span><span class="wd-value">60%</span></div>
@@ -143,34 +159,169 @@ const Weather = (() => {
         `;
     }
 
+    /* ---------- 城市栏渲染 ---------- */
+    function renderCityBar() {
+        const bar = document.getElementById("weatherCityBar");
+        if (!bar) return;
+
+        if (!cities.length) {
+            bar.innerHTML = '<div class="weather-empty">还没有城市，在下方添加你关注的城市吧～</div>';
+            return;
+        }
+
+        bar.innerHTML = cities.map(c => `
+            <div class="city-chip ${c.id === currentId ? "active" : ""}" data-id="${c.id}">
+                <span class="chip-name" data-edit="${c.id}">${escapeHtml(c.name)}</span>
+                <button class="chip-edit" data-edit="${c.id}" title="改名" type="button">✎</button>
+                <button class="chip-del" data-del="${c.id}" title="删除" type="button">×</button>
+            </div>
+        `).join("");
+
+        // 切换城市（点击 chip 主体，避开编辑/删除按钮）
+        bar.querySelectorAll(".city-chip").forEach(chip => {
+            chip.addEventListener("click", e => {
+                if (e.target.closest(".chip-edit") || e.target.closest(".chip-del")) return;
+                selectCity(chip.dataset.id);
+            });
+        });
+        // 删除
+        bar.querySelectorAll(".chip-del").forEach(btn => {
+            btn.addEventListener("click", e => {
+                e.stopPropagation();
+                removeCity(btn.dataset.del);
+            });
+        });
+        // 改名
+        bar.querySelectorAll(".chip-edit").forEach(btn => {
+            btn.addEventListener("click", e => {
+                e.stopPropagation();
+                startEdit(btn.dataset.edit);
+            });
+        });
+    }
+
+    /* ---------- 改名 ---------- */
+    function startEdit(id) {
+        const chip = document.querySelector(`.city-chip[data-id="${id}"]`);
+        if (!chip) return;
+        const nameSpan = chip.querySelector(".chip-name");
+        const old = nameSpan.textContent.trim();
+        chip.classList.add("editing");
+        nameSpan.outerHTML = `<input class="chip-edit-input" type="text" value="${escapeHtml(old)}" maxlength="30" />`;
+        const input = chip.querySelector(".chip-edit-input");
+        input.focus();
+        input.select();
+        const commit = () => {
+            const v = input.value.trim();
+            if (v && v !== old) renameCity(id, v);
+            else renderCityBar(); // 取消
+        };
+        input.addEventListener("keydown", e => {
+            if (e.key === "Enter") { e.preventDefault(); commit(); }
+            else if (e.key === "Escape") { e.preventDefault(); renderCityBar(); }
+        });
+        input.addEventListener("blur", commit);
+    }
+
+    /* ---------- 添加城市 ---------- */
+    function addCity() {
+        const input = document.getElementById("weatherAddInput");
+        if (!input) return;
+        const name = input.value.trim();
+        if (!name) return;
+
+        // 查重（忽略大小写）
+        if (cities.find(c => c.name.toLowerCase() === name.toLowerCase())) {
+            Api.showToast("该城市已在列表中", "info");
+            input.value = "";
+            input.focus();
+            return;
+        }
+
+        const id = "c" + Date.now().toString(36);
+        cities.push({ id, name });
+        saveCities(cities);
+        input.value = "";
+        const first = !currentId;
+        // 若此前没有城市，自动选中新加的
+        if (first) {
+            currentId = id;
+            localStorage.setItem(CITY_KEY, id);
+        }
+        renderCityBar();
+        Api.showToast(`已添加 ${name}`, "success");
+        if (first) load();
+    }
+
+    /* ---------- 删除城市 ---------- */
+    function removeCity(id) {
+        const idx = cities.findIndex(c => c.id === id);
+        if (idx < 0) return;
+        const removed = cities[idx];
+        cities.splice(idx, 1);
+        saveCities(cities);
+
+        if (currentId === id) {
+            currentId = cities.length ? cities[0].id : "";
+            localStorage.setItem(CITY_KEY, currentId);
+        }
+        renderCityBar();
+        if (currentId) load();
+        else {
+            const body = document.getElementById("weatherBody");
+            if (body) body.innerHTML = '<p class="loading-text">添加城市后可查看天气</p>';
+        }
+        Api.showToast(`已删除 ${removed.name}`, "info");
+    }
+
+    /* ---------- 改名提交 ---------- */
+    function renameCity(id, newName) {
+        const c = cities.find(x => x.id === id);
+        if (!c) return;
+        c.name = newName;
+        saveCities(cities);
+        renderCityBar();
+        // 若改的是当前城市，重新拉天气
+        if (currentId === id) load();
+        Api.showToast("已更新城市名", "success");
+    }
+
+    /* ---------- 切换城市 ---------- */
+    function selectCity(id) {
+        if (currentId === id) return;
+        currentId = id;
+        localStorage.setItem(CITY_KEY, id);
+        renderCityBar();
+        load();
+    }
+
     /* ---------- 加载 ---------- */
     async function load() {
         const body = document.getElementById("weatherBody");
         if (!body) return;
+        const city = currentCity();
+        if (!city) {
+            body.innerHTML = '<p class="loading-text">添加城市后可查看天气</p>';
+            return;
+        }
         body.innerHTML = '<p class="loading-text">天气加载中…</p>';
         try {
-            const data = await fetchWeather(currentCity);
-            render(data);
+            const data = await fetchWeather(city.name);
+            render(data, city);
         } catch (e) {
             console.warn("天气获取失败:", e);
-            renderFallback();
+            renderFallback(city);
         }
-    }
-
-    /* ---------- 切换城市 ---------- */
-    function switchCity(city) {
-        currentCity = city;
-        localStorage.setItem(CITY_KEY, city);
-        load();
     }
 
     /* ---------- 初始化 ---------- */
     function init() {
-        const sel = document.getElementById("weatherCity");
-        if (sel) {
-            sel.value = currentCity;
-            sel.addEventListener("change", e => switchCity(e.target.value));
-        }
+        const input = document.getElementById("weatherAddInput");
+        const addBtn = document.getElementById("weatherAddBtn");
+        if (input) input.addEventListener("keydown", e => { if (e.key === "Enter") addCity(); });
+        if (addBtn) addBtn.addEventListener("click", addCity);
+
+        renderCityBar();
         load();
     }
 

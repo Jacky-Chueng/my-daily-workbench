@@ -129,22 +129,12 @@ window.APP_CONFIG = {
     /* =================================================================
        六、今日天气
        ✅ 无需修改。使用 wttr.in 免费天气服务（无需 API Key）。
-       如需新增城市，在 cities 数组中添加 { value: "拼音", label: "中文名" }。
+       城市列表不再预设——由用户在页面上自行添加/删除/改名，
+       仅保存在浏览器 localStorage（键 dw_weather_cities），不在此写死。
        ================================================================= */
     weather: {
-        defaultCity: "Beijing",
-        cities: [
-            { value: "Beijing", label: "北京" },
-            { value: "Shanghai", label: "上海" },
-            { value: "Guangzhou", label: "广州" },
-            { value: "Shenzhen", label: "深圳" },
-            { value: "Hangzhou", label: "杭州" },
-            { value: "Chengdu", label: "成都" },
-            { value: "Wuhan", label: "武汉" },
-            { value: "Nanjing", label: "南京" },
-            { value: "Xian", label: "西安" },
-            { value: "Chongqing", label: "重庆" }
-        ]
+        defaultCity: "",
+        cities: []
     },
 
     /* =================================================================
