@@ -349,18 +349,29 @@ const Almanac = (() => {
         load(today);
     }
 
+    /* ---------- 事件委托（模块加载即绑定，卡片被布局模块移动/重建后仍生效） ---------- */
+    function onAlmanacChange(e) {
+        const t = e.target;
+        if (t && t.id === "almanacDate") setDate(t.value);
+    }
+    function onAlmanacClick(e) {
+        const t = e.target;
+        if (!t || !t.id) return;
+        if (t.id === "almanacPrev") shiftDay(-1);
+        else if (t.id === "almanacNext") shiftDay(1);
+        else if (t.id === "almanacToday") goToday();
+    }
+    // 在 document 上委托，避免直接绑定在元素上因 DOM 重排（自定义布局）而失效；
+    // 同时监听 change + input，兼容各浏览器在日期选择器确认时只触发其一的情况。
+    if (typeof document !== "undefined") {
+        document.addEventListener("change", onAlmanacChange);
+        document.addEventListener("input", onAlmanacChange);
+        document.addEventListener("click", onAlmanacClick);
+    }
+
     function init() {
         const input = els.dateInput();
-        if (input) {
-            input.value = fmtKey(selectedDate);
-            input.addEventListener("change", e => setDate(e.target.value));
-        }
-        const prev = els.prevBtn();
-        if (prev) prev.addEventListener("click", () => shiftDay(-1));
-        const next = els.nextBtn();
-        if (next) next.addEventListener("click", () => shiftDay(1));
-        const today = els.todayBtn();
-        if (today) today.addEventListener("click", goToday);
+        if (input) input.value = fmtKey(selectedDate);
         load();
     }
 
