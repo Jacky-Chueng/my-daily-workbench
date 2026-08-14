@@ -146,7 +146,14 @@
                     <!-- 黄历卡 -->
                     <article class="card card-almanac" id="almanacCard">
                         <div class="card-head">
-                            <h2><span class="emoji">&#128197;</span> 今日黄历</h2>
+                            <h2><span class="emoji">&#128197;</span> 黄历</h2>
+                            <div class="almanac-nav">
+                                <button class="almanac-arrow" id="almanacPrev" title="前一天">&#8249;</button>
+                                <input type="date" id="almanacDate" class="almanac-date-input"
+                                       title="选择日期查看黄历" />
+                                <button class="almanac-arrow" id="almanacNext" title="后一天">&#8250;</button>
+                                <button class="almanac-today" id="almanacToday" title="回到今天">今天</button>
+                            </div>
                         </div>
                         <div class="almanac-body" id="almanacBody">
                             <p class="loading-text">黄历加载中…</p>

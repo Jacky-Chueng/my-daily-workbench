@@ -548,6 +548,7 @@ button { font-family: inherit; cursor: pointer; }
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 12px;
     padding: 20px 24px 16px;
     border-bottom: 1px solid var(--border-soft);
@@ -835,6 +836,62 @@ button { font-family: inherit; cursor: pointer; }
     display: grid;
     gap: 14px;
 }
+
+/* 黄历日期导航（自选日期） */
+.almanac-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.almanac-arrow {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-card);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text-soft);
+    transition: all .2s var(--ease);
+}
+.almanac-arrow:hover { border-color: var(--primary); color: var(--primary); }
+.almanac-today {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-card);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--text-soft);
+    transition: all .2s var(--ease);
+}
+.almanac-today:hover { border-color: var(--primary); color: var(--primary); }
+.almanac-date-input {
+    height: 28px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg-card);
+    color-scheme: light;
+    outline: none;
+    transition: border-color .2s var(--ease);
+}
+.almanac-date-input:focus { border-color: var(--primary); }
+.almanac-tag {
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.almanac-tag.tag-today { background: var(--success-soft); color: var(--success); }
+.almanac-tag.tag-picked { background: var(--primary-soft, #efeae0); color: var(--primary); }
 
 .almanac-date {
     display: flex;

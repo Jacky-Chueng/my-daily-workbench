@@ -13,8 +13,34 @@
 const Almanac = (() => {
 
     const els = {
-        body: () => document.getElementById("almanacBody")
+        body: () => document.getElementById("almanacBody"),
+        dateInput: () => document.getElementById("almanacDate"),
+        prevBtn: () => document.getElementById("almanacPrev"),
+        nextBtn: () => document.getElementById("almanacNext"),
+        todayBtn: () => document.getElementById("almanacToday")
     };
+
+    // 当前选中的日期（默认今天），可切换为任意一天查看黄历
+    let selectedDate = new Date();
+
+    // 日期 <-> "YYYY-MM-DD"
+    function fmtKey(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    }
+    function parseKey(str) {
+        const parts = (str || "").split("-").map(Number);
+        if (parts.length === 3 && parts[0] && parts[1] && parts[2])
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        return null;
+    }
+    function isSameDay(a, b) {
+        return a.getFullYear() === b.getFullYear() &&
+               a.getMonth() === b.getMonth() &&
+               a.getDate() === b.getDate();
+    }
 
     /* =================================================================
        一、农历核心数据表（1900-2100）
@@ -218,8 +244,8 @@ const Almanac = (() => {
     /* =================================================================
        七、组装完整黄历信息
        ================================================================= */
-    function buildAlmanac() {
-        const now = new Date();
+    function buildAlmanac(srcDate) {
+        const now = srcDate || new Date();
         const y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate();
         const week = ["周日","周一","周二","周三","周四","周五","周六"][now.getDay()];
 
@@ -266,9 +292,13 @@ const Almanac = (() => {
        八、渲染
        ================================================================= */
     function render(info) {
+        const isToday = isSameDay(selectedDate, new Date());
+        const tag = isToday
+            ? '<span class="almanac-tag tag-today">今天</span>'
+            : '<span class="almanac-tag tag-picked">所选</span>';
         els.body().innerHTML = `
             <div class="almanac-date">
-                <span class="almanac-solar">${info.solar} ${info.week}</span>
+                <span class="almanac-solar">${info.solar} ${info.week} ${tag}</span>
                 <span class="almanac-lunar">${info.lunar}</span>
             </div>
             <div class="almanac-yiji">
@@ -285,17 +315,55 @@ const Almanac = (() => {
         `;
     }
 
-    function load() {
+    function load(date) {
+        if (date) selectedDate = date;
         els.body().innerHTML = '<p class="loading-text">黄历计算中…</p>';
         try {
-            render(buildAlmanac());
+            render(buildAlmanac(selectedDate));
         } catch (e) {
             console.error("黄历计算失败:", e);
             els.body().innerHTML = '<p class="loading-text">黄历计算出错，请刷新重试</p>';
         }
     }
 
-    function init() { load(); }
+    // 选择某天（来自日期选择器）
+    function setDate(key) {
+        const d = parseKey(key);
+        if (d) load(d);
+    }
+
+    // 前后一天切换
+    function shiftDay(delta) {
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() + delta);
+        const input = els.dateInput();
+        if (input) input.value = fmtKey(d);
+        load(d);
+    }
+
+    // 回到今天
+    function goToday() {
+        const today = new Date();
+        const input = els.dateInput();
+        if (input) input.value = fmtKey(today);
+        load(today);
+    }
+
+    function init() {
+        const input = els.dateInput();
+        if (input) {
+            input.value = fmtKey(selectedDate);
+            input.addEventListener("change", e => setDate(e.target.value));
+        }
+        const prev = els.prevBtn();
+        if (prev) prev.addEventListener("click", () => shiftDay(-1));
+        const next = els.nextBtn();
+        if (next) next.addEventListener("click", () => shiftDay(1));
+        const today = els.todayBtn();
+        if (today) today.addEventListener("click", goToday);
+        load();
+    }
+
     function refresh() { load(); }
 
     return { init, refresh };
