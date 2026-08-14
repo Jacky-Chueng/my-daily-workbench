@@ -26,15 +26,15 @@ const Todo = (() => {
     }
 
     function load() {
-        let items = Api.store.get(KEY, []);
-        let changed = false;
-        items = items.map(it => {
+        const items = Api.store.get(KEY, []);
+        return items.map((it, idx) => {
             if (!it || typeof it !== "object") return it;
-            if (!it.id) { it.id = uid(); changed = true; }
-            return it;
+            const copy = { ...it };
+            if (!copy.id) copy.id = uid();
+            // 手动排序字段：缺失时按数组顺序兜底（写入后才持久化）
+            if (typeof copy.sortOrder !== "number") copy.sortOrder = idx;
+            return copy;
         });
-        if (changed) save(items);
-        return items;
     }
     function save(items) { Api.store.set(KEY, items); }
 
@@ -68,10 +68,10 @@ const Todo = (() => {
     /* ---------- 渲染 ---------- */
     function render() {
         let items = load();
-        // 未完成的在前，已完成的在后
+        // 未完成的在前，已完成的在后；同组内按手动排序 sortOrder
         items = items.slice().sort((a, b) => {
             if (a.done !== b.done) return a.done ? 1 : -1;
-            return (b.createdAt || 0) - (a.createdAt || 0);
+            return (a.sortOrder || 0) - (b.sortOrder || 0);
         });
 
         const list = els.list();
@@ -89,14 +89,15 @@ const Todo = (() => {
         list.innerHTML = items.map(t => {
             if (t.id === editingId) {
                 return `
-                <li class="todo-item editing">
+                <li class="todo-item editing" data-id="${t.id}">
                     <input type="text" class="todo-edit-input" data-id="${t.id}" value="${escapeHtml(t.text)}">
                     <button class="todo-edit-save" data-id="${t.id}" title="保存">✓</button>
                     <button class="todo-edit-cancel" data-id="${t.id}" title="取消">✕</button>
                 </li>`;
             }
             return `
-                <li class="todo-item ${t.done ? "done" : ""}">
+                <li class="todo-item ${t.done ? "done" : ""}" data-id="${t.id}">
+                    <span class="todo-drag" title="拖动排序">⠿</span>
                     <input type="checkbox" class="todo-check" data-id="${t.id}" ${t.done ? "checked" : ""}>
                     <span class="todo-text">${escapeHtml(t.text)}</span>
                     <button class="todo-edit" data-id="${t.id}" title="编辑">✎</button>
@@ -136,7 +137,11 @@ const Todo = (() => {
         text = text.trim();
         if (!text) return;
         const items = load();
-        items.push({ id: uid(), text, done: false, createdAt: Date.now() });
+        // 新事项排到「未完成」组的末尾
+        const maxOrder = items
+            .filter(i => !i.done)
+            .reduce((m, i) => Math.max(m, i.sortOrder || 0), -1);
+        items.push({ id: uid(), text, done: false, createdAt: Date.now(), sortOrder: maxOrder + 1 });
         save(items);
         render();
     }
@@ -184,6 +189,73 @@ const Todo = (() => {
         render();
     }
 
+    /* ---------- 拖拽排序（鼠标 + 触屏通用，靠手柄发起）---------- */
+    function initDrag() {
+        const list = els.list();
+        if (!list) return;
+        let dragItem = null, active = false, startY = 0, startX = 0;
+
+        function onMove(e) {
+            if (!dragItem) return;
+            const dx = e.clientX - startX, dy = e.clientY - startY;
+            if (!active) {
+                if (Math.hypot(dx, dy) < 6) return;   // 移动阈值，避免误触
+                active = true;
+                dragItem.classList.add("dragging");
+            }
+            e.preventDefault();
+            const y = e.clientY;
+            const sibs = Array.from(list.querySelectorAll("li.todo-item:not(.dragging)"));
+            let target = null;
+            for (const s of sibs) {
+                const r = s.getBoundingClientRect();
+                if (y < r.top + r.height / 2) { target = s; break; }
+            }
+            if (target) list.insertBefore(dragItem, target);
+            else list.appendChild(dragItem);
+        }
+
+        function onUp() {
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onUp);
+            document.removeEventListener("pointercancel", onUp);
+            const item = dragItem;
+            dragItem = null;
+            const wasActive = active;
+            active = false;
+            if (item) item.classList.remove("dragging");
+            if (!wasActive || !item) return;
+
+            // 按拖拽后的 DOM 顺序，重排同组（未完成/已完成）内的 sortOrder
+            const domIds = Array.from(list.querySelectorAll("li.todo-item")).map(li => li.dataset.id);
+            const items = load();
+            const byId = new Map(items.map(i => [i.id, i]));
+            const undoneIds = domIds.filter(id => byId.has(id) && !byId.get(id).done);
+            const doneIds = domIds.filter(id => byId.has(id) && byId.get(id).done);
+            const rank = new Map();
+            undoneIds.forEach((id, i) => rank.set(id, i));
+            doneIds.forEach((id, i) => rank.set(id, i));
+            items.forEach(it => { if (rank.has(it.id)) it.sortOrder = rank.get(it.id); });
+            save(items);
+            render();
+        }
+
+        list.addEventListener("pointerdown", e => {
+            if (e.target.closest(".todo-edit-input")) return;
+            const handle = e.target.closest(".todo-drag");
+            if (!handle) return;
+            const item = handle.closest(".todo-item");
+            if (!item || item.classList.contains("editing")) return;
+            active = false;
+            dragItem = item;
+            startY = e.clientY;
+            startX = e.clientX;
+            document.addEventListener("pointermove", onMove);
+            document.addEventListener("pointerup", onUp);
+            document.addEventListener("pointercancel", onUp);
+        });
+    }
+
     /* ---------- 初始化 ---------- */
     function init() {
         migrateLegacy(); // 先迁移旧数据
@@ -200,6 +272,7 @@ const Todo = (() => {
         document.addEventListener("dw:remoteSynced", () => {
             if (!editingId) render();   // 正在行内编辑时不打断
         });
+        initDrag();
         render();
     }
 

@@ -18,11 +18,11 @@ const Home = (() => {
         refreshVocab: () => document.getElementById("refreshVocabCard")
     };
 
-    /* ---------- 排序：未完成在前 ---------- */
+    /* ---------- 排序：未完成在前，同组按手动顺序 ---------- */
     function sortedTodos() {
         return Todo.load().sort((a, b) => {
             if (a.done !== b.done) return a.done ? 1 : -1;
-            return (b.createdAt || 0) - (a.createdAt || 0);
+            return (a.sortOrder || 0) - (b.sortOrder || 0);
         });
     }
 
@@ -75,11 +75,8 @@ const Home = (() => {
     function addTodo(text) {
         text = text.trim();
         if (!text) return;
-        const items = Todo.load();
-        items.push({ text, done: false, createdAt: Date.now() });
-        Todo.save(items);
+        Todo.add(text);          // 复用主模块：自动分配 id / sortOrder
         renderTodo();
-        Todo.refresh();
         Api.showToast("已添加待办", "success");
     }
 

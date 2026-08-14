@@ -1078,6 +1078,31 @@ button { font-family: inherit; cursor: pointer; }
 .todo-edit-cancel { color: var(--text-faint); }
 .todo-edit-cancel:hover { background: var(--border-soft); }
 
+/* 拖拽手柄（鼠标 + 触屏通用） */
+.todo-drag {
+    flex-shrink: 0;
+    cursor: grab;
+    color: var(--text-faint);
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 6px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;            /* 触屏拖拽时不触发页面滚动 */
+    transition: color .2s var(--ease), background .2s var(--ease);
+}
+.todo-drag:hover { color: var(--primary); background: var(--border-soft); }
+.todo-drag:active { cursor: grabbing; }
+
+/* 拖拽进行中 */
+.todo-item.dragging {
+    opacity: .45;
+    background: var(--primary-soft);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .12);
+}
+
 /* =====================================================================
    心情记录模块
    ===================================================================== */
