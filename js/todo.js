@@ -73,6 +73,8 @@ const Todo = (() => {
             if (a.done !== b.done) return a.done ? 1 : -1;
             return (a.sortOrder || 0) - (b.sortOrder || 0);
         });
+        // 过滤已删除（墓碑 _deleted）的项——删除通过墓碑跨设备同步
+        items = items.filter(t => !t._deleted);
 
         const list = els.list();
         const count = els.count();
@@ -137,9 +139,9 @@ const Todo = (() => {
         text = text.trim();
         if (!text) return;
         const items = load();
-        // 新事项排到「未完成」组的末尾
+        // 新事项排到「未完成」组的末尾（排除已删除的墓碑项）
         const maxOrder = items
-            .filter(i => !i.done)
+            .filter(i => !i.done && !i._deleted)
             .reduce((m, i) => Math.max(m, i.sortOrder || 0), -1);
         items.push({ id: uid(), text, done: false, createdAt: Date.now(), sortOrder: maxOrder + 1 });
         save(items);
@@ -158,8 +160,12 @@ const Todo = (() => {
 
     function remove(id) {
         const items = load();
-        const next = items.filter(x => x.id !== id);
-        save(next);
+        const it = items.find(x => x.id === id);
+        if (!it) return;
+        // 墓碑式删除：不打断数组，仅标记 _deleted，使其能随同步传到其他设备
+        it._deleted = true;
+        it._deletedAt = Date.now();
+        save(items);
         render();
     }
 

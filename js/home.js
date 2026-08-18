@@ -18,9 +18,9 @@ const Home = (() => {
         refreshVocab: () => document.getElementById("refreshVocabCard")
     };
 
-    /* ---------- 排序：未完成在前，同组按手动顺序 ---------- */
+    /* ---------- 排序：未完成在前，同组按手动顺序（排除已删除墓碑）---------- */
     function sortedTodos() {
-        return Todo.load().sort((a, b) => {
+        return Todo.load().filter(t => !t._deleted).sort((a, b) => {
             if (a.done !== b.done) return a.done ? 1 : -1;
             return (a.sortOrder || 0) - (b.sortOrder || 0);
         });
@@ -94,9 +94,11 @@ const Home = (() => {
 
     function removeTodo(id) {
         const items = Todo.load();
-        const idx = items.findIndex(t => t.id === id);
-        if (idx >= 0) {
-            items.splice(idx, 1);
+        const it = items.find(t => t.id === id);
+        if (it) {
+            // 墓碑式删除：标记 _deleted，使其随云同步传到其他设备
+            it._deleted = true;
+            it._deletedAt = Date.now();
             Todo.save(items);
             renderTodo();
             Todo.refresh();

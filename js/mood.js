@@ -45,7 +45,7 @@ const Mood = (() => {
         const list = els.history();
         if (!list) return;
 
-        const dates = Object.keys(all).filter(d => all[d] && all[d].mood).sort((a, b) => b.localeCompare(a));
+        const dates = Object.keys(all).filter(d => all[d] && all[d].mood && !all[d]._deleted).sort((a, b) => b.localeCompare(a));
 
         if (!dates.length) {
             list.innerHTML = '<li class="mood-history-empty">还没有心情记录，选个表情开始吧～</li>';
@@ -150,7 +150,11 @@ const Mood = (() => {
     function removeRecord(date) {
         if (!confirm(`确定删除 ${Api.friendlyDate(date)} 的心情记录吗？`)) return;
         const all = loadAll();
-        delete all[date];
+        // 墓碑式删除：标记 _deleted，使其随云同步传到其他设备（对象合并不会传播"删除键"）
+        if (all[date]) {
+            all[date]._deleted = true;
+            all[date]._deletedAt = Date.now();
+        }
         saveAll(all);
         if (editingDate === date) cancelEdit();
         else renderHistory();
