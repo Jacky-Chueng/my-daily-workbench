@@ -81,17 +81,18 @@
             const vocabEl = document.getElementById("statVocab");
             if (vocabEl) vocabEl.textContent = vocab.length;
 
-            // 待办事项（通用，不再按天）
-            const todos = Api.store.get(CFG.todos, []);
+            // 待办事项（通用，不再按天；排除墓碑 _deleted，计数与列表一致）
+            const todos = Api.store.get(CFG.todos, []).filter(t => !t._deleted);
             const done = todos.filter(t => t.done).length;
             const doneEl = document.getElementById("statTodoDone");
             const totalEl = document.getElementById("statTodoTotal");
             if (doneEl) doneEl.textContent = done;
             if (totalEl) totalEl.textContent = todos.length;
 
-            // 今日心情
+            // 今日心情（墓碑态视为未记录）
             const moods = Api.store.get(CFG.moods, {});
-            const todayMood = moods[Api.todayKey()];
+            const _t = moods[Api.todayKey()];
+            const todayMood = _t && !_t._deleted ? _t : null;
             const moodEl = document.getElementById("statMood");
             if (moodEl) moodEl.textContent = todayMood ? todayMood.mood : "—";
         }

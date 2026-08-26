@@ -228,5 +228,5 @@ const CloudSync = (() => {
         subscribeRealtime();
     }
 
-    return { init };
+    return { init, flushNow: flush };
 })();

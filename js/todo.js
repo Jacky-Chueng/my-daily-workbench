@@ -195,6 +195,18 @@ const Todo = (() => {
         render();
     }
 
+    /* ---------- 物理清理：永久删除所有墓碑 _deleted 项 ----------
+       墓碑原本是为跨设备同步删除而保留的；清理后云端也会被覆盖（不再有这些项） */
+    function purgeDeleted() {
+        const items = load();
+        const tombstones = items.filter(t => t._deleted);
+        if (!tombstones.length) return { removed: 0, remaining: items.length };
+        const kept = items.filter(t => !t._deleted);
+        save(kept);
+        render();
+        return { removed: tombstones.length, remaining: kept.length };
+    }
+
     /* ---------- 拖拽排序（鼠标 + 触屏通用，靠手柄发起）---------- */
     function initDrag() {
         const list = els.list();
@@ -274,6 +286,19 @@ const Todo = (() => {
                 Api.showToast("已添加待办", "success");
             });
         }
+        // 清理墓碑按钮：把已删除项从 localStorage 和云端一起抹掉
+        const purgeBtn = document.getElementById("todoPurgeBtn");
+        if (purgeBtn) {
+            purgeBtn.addEventListener("click", () => {
+                const n = load().filter(t => t._deleted).length;
+                if (!n) { Api.showToast("没有可清理的已删除项", ""); return; }
+                if (!confirm(`将永久清理 ${n} 条已删除的待办（云端也会同步清理），确定吗？`)) return;
+                const r = purgeDeleted();
+                // 立刻把清理后的本地数据推到云端，避免被残留的云端墓碑"复活"
+                if (window.CloudSync && CloudSync.flushNow) CloudSync.flushNow();
+                Api.showToast(`已清理 ${r.removed} 条，剩余 ${r.remaining} 条`, "success");
+            });
+        }
         // 云端同步完成后（其他设备改了数据）重新渲染本页
         document.addEventListener("dw:remoteSynced", () => {
             if (!editingId) render();   // 正在行内编辑时不打断
@@ -284,5 +309,5 @@ const Todo = (() => {
 
     function refresh() { render(); }
 
-    return { init, refresh, add, load, save };
+    return { init, refresh, add, load, save, purgeDeleted };
 })();

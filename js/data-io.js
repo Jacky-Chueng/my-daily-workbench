@@ -9,15 +9,15 @@
 const DataIO = (() => {
     const SK = window.APP_CONFIG.storageKeys;
 
-    /* ---------- 收集所有需导出的数据 ---------- */
+    /* ---------- 收集所有需导出的数据（排除墓碑，备份只留"活的"）---------- */
     function collectData() {
         const data = {};
 
         // 1. 生词库
         data.vocabulary = Api.store.get(SK.vocabulary, []);
 
-        // 2. 待办事项（通用，不再按天）
-        data.todos = Api.store.get(SK.todos, []);
+        // 2. 待办事项（排除已删除墓碑）
+        data.todos = Api.store.get(SK.todos, []).filter(t => !t._deleted);
 
         // 2b. 兼容旧的按天存储数据（迁移用）
         const legacyTodos = {};
@@ -32,8 +32,11 @@ const DataIO = (() => {
             data.todosLegacy = legacyTodos;
         }
 
-        // 3. 心情记录
-        data.moods = Api.store.get(SK.moods, {});
+        // 3. 心情记录（排除已删除墓碑）
+        const allMoods = Api.store.get(SK.moods, {});
+        data.moods = Object.fromEntries(
+            Object.entries(allMoods).filter(([, v]) => v && !v._deleted)
+        );
 
         return data;
     }
