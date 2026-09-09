@@ -101,13 +101,14 @@ const CloudSync = (() => {
     function mergeFitness(local, remote) {
         const l = local || {}, r = remote || {};
         const out = { ...l };
-        if (r.goal !== undefined) out.goal = r.goal;
-        if (r.trainingDays !== undefined) out.trainingDays = r.trainingDays;
+        // 设置类：只有「非 null/undefined」才覆盖——避免云端历史 null 把用户本地设置抹掉
+        if (r.goal != null) out.goal = r.goal;
+        if (r.trainingDays != null) out.trainingDays = r.trainingDays;
 
         const ts2 = x => (x && (x.updatedAt || x.generatedAt || x.date ? (x.updatedAt || x.generatedAt || 0) : 0)) || 0;
-        if (r.metrics !== undefined) out.metrics = ts2(r.metrics) >= ts2(l.metrics) ? r.metrics : l.metrics;
-        if (r.advice !== undefined) out.advice = ts2(r.advice) >= ts2(l.advice) ? r.advice : l.advice;
-        if (r.coaching !== undefined) out.coaching = ts2(r.coaching) >= ts2(l.coaching) ? r.coaching : l.coaching;
+        if (r.metrics != null) out.metrics = ts2(r.metrics) >= ts2(l.metrics) ? r.metrics : l.metrics;
+        if (r.advice != null) out.advice = ts2(r.advice) >= ts2(l.advice) ? r.advice : l.advice;
+        if (r.coaching != null) out.coaching = ts2(r.coaching) >= ts2(l.coaching) ? r.coaching : l.coaching;
 
         // 手动课型标记：按日期 union，两端标记都保留（同一天冲突时本地优先）
         out.manualTypes = { ...(r.manualTypes || {}), ...(l.manualTypes || {}) };
@@ -119,7 +120,7 @@ const CloudSync = (() => {
 
         if (l.adHoc && l.adHoc.status === "pending") {
             out.adHoc = (!r.adHoc || (r.adHoc.requestedAt || 0) < (l.adHoc.requestedAt || 0)) ? l.adHoc : r.adHoc;
-        } else if (r.adHoc !== undefined) out.adHoc = r.adHoc;
+        } else if (r.adHoc != null) out.adHoc = r.adHoc;
 
         // syncRequest / pushWorkout：pending 优先，否则取时间戳更晚者，避免请求被旧数据覆盖丢失
         const keepRequest = (la, ra) => {
@@ -131,9 +132,9 @@ const CloudSync = (() => {
             return (ra.requestedAt || 0) >= (la.requestedAt || 0) ? ra : la;
         };
         const sr = keepRequest(l.syncRequest, r.syncRequest);
-        if (sr !== undefined) out.syncRequest = sr;
+        if (sr != null) out.syncRequest = sr;
         const pw = keepRequest(l.pushWorkout, r.pushWorkout);
-        if (pw !== undefined) out.pushWorkout = pw;
+        if (pw != null) out.pushWorkout = pw;
 
         return out;
     }

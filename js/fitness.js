@@ -672,7 +672,12 @@ const Fitness = (() => {
     }
 
     function renderPlanHtml(data) {
-        const plan = generatePlan(data, 14);
+        // 优先用云端的 14 天计划（coach.py 跑出的，遵守 claude-fitness-cn 周期化逻辑），
+        // 失败才退回旧的本地 generatePlan
+        const cloudPlan = (data.coaching && data.coaching.plan) || data.plan;
+        const plan = (Array.isArray(cloudPlan) && cloudPlan.length)
+            ? cloudPlan
+            : generatePlan(data, 14);
         const t = todayStr();
         // 今天这一行用 coach 的权威结果（已考虑准备度 + ACWR），否则退回 suggestWorkout
         const coaching = getTodayCoaching(data);
@@ -707,7 +712,8 @@ const Fitness = (() => {
             const label = dObj ? `${dObj.getMonth() + 1}月${dObj.getDate()}日 · 周${WEEK_NAMES[p.wd]}` : p.date;
             const isToday = p.date === t;
             const meta = item.km ? `${item.km} km${item.pace ? " · " + item.pace + "/km" : ""}` : "—";
-            return `<div class="fit-plan-day ${isToday ? "today" : ""} ${item.overload ? "overload" : ""}" data-date="${p.date}">
+            const overloadFlag = (p.flags && p.flags.length) ? true : item.overload;
+            return `<div class="fit-plan-day ${isToday ? "today" : ""} ${overloadFlag ? "overload" : ""}" data-date="${p.date}">
                 <div class="fit-plan-row">
                     <span class="fit-plan-date">${label}${isToday ? " <b>今天</b>" : ""}</span>
                     <span class="fit-plan-type t-${item.type}">${T.icon} ${escapeHtml(item.name)}</span>
@@ -716,13 +722,14 @@ const Fitness = (() => {
                 </div>
                 <div class="fit-plan-detail hidden">
                     <div class="fit-plan-detail-text">${escapeHtml(item.detail || "")}</div>
-                    ${item.overload ? `<div class="fit-warn" style="margin-top:6px">⚠ 负荷比过高，已自动降量（与上方"今日课表"一致）</div>` : ""}
+                    ${overloadFlag ? `<div class="fit-warn" style="margin-top:6px">⚠ ${(p.flags || []).join(" · ") || "负荷比过高，已自动降量"}</div>` : ""}
                     ${item.type !== "rest" && item.type !== "recovery" && !isToday ? `<button class="fit-plan-push btn btn-ghost btn-xs" data-date="${p.date}" type="button" title="推到佳明 Connect，同步后手表上跟着练">⌚ 推到佳明</button>` : ""}
                     ${isToday && item.type !== "rest" && item.type !== "recovery" ? `<button class="fit-plan-push btn btn-ghost btn-xs" data-date="${p.date}" type="button" title="把今天降量后的课表推到手表">⌚ 推到佳明</button>` : ""}
                 </div>
             </div>`;
         }).join("");
-        return `<div class="fit-plan-head">未来两周计划 <span class="fit-plan-sub">点开某天看课表，可推到手表</span></div><div class="fit-plan-list">${rows}</div>`;
+        const source = (Array.isArray(cloudPlan) && cloudPlan.length) ? "新算法（coach.py）" : "本地估算";
+        return `<div class="fit-plan-head">未来两周计划 <span class="fit-plan-sub">${source} · 点开某天看课表，可推到手表</span></div><div class="fit-plan-list">${rows}</div>`;
     }
 
     // 推送到佳明：写 pushWorkout 请求，由守护进程调 push_workout.py 上传
