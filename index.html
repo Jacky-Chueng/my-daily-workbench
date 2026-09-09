@@ -7,8 +7,8 @@
     <meta name="description" content="每日英语学习、黄历、每日要闻、待办事项与心情记录一站式工作台">
     <!-- 版本号：每次 push 前把 ?v= 后面改一下（如 20260909a → 20260910b），
          否则 GitHub Pages 有 10 分钟缓存，刷新可能看不到最新改动 -->
-    <link rel="stylesheet" href="css/styles.css?v=20260909a">
-    <script src="js/config.js?v=20260909a"></script>
+    <link rel="stylesheet" href="css/styles.css?v=20260909b">
+    <script src="js/config.js?v=20260909b"></script>
 </head>
 <body>
     <!-- 顶部导航栏 -->
@@ -105,6 +105,10 @@
                 <button class="nav-item" data-page="mood">
                     <span class="nav-icon">&#128578;</span>
                     <span class="nav-label">每日心情</span>
+                </button>
+                <button class="nav-item" data-page="fitness">
+                    <span class="nav-icon">&#127939;</span>
+                    <span class="nav-label">训练建议</span>
                 </button>
             </nav>
 
@@ -290,6 +294,27 @@
                 </article>
             </section>
 
+            <!-- 页面：训练建议 -->
+            <section class="page" id="page-fitness">
+                <article class="card card-fitness" id="fitnessCard">
+                    <div class="card-head">
+                        <h2><span class="emoji">&#127939;</span> 今日训练 <span class="count-badge" id="fitnessCountdown">未设目标</span></h2>
+                    </div>
+
+                    <div id="fitToday"></div>
+                    <div id="fitWorkout"></div>
+
+                    <div class="fit-actions">
+                        <button id="fitAdHocBtn" class="btn btn-primary btn-sm" type="button" title="今天临时有空，马上给我一条能跑的">临时想练 · 生成今日课表</button>
+                        <button id="fitSettingsBtn" class="btn btn-ghost btn-sm" type="button">⚙ 目标与训练日</button>
+                    </div>
+
+                    <div id="fitWeek"></div>
+
+                    <div id="fitSettings" class="fit-settings hidden"></div>
+                </article>
+            </section>
+
         </main>
     </div>
 
@@ -297,20 +322,21 @@
     <div id="toast" class="toast hidden"></div>
 
     <!-- 模块脚本（顺序加载） -->
-    <script src="js/api.js?v=20260909a"></script>
-    <script src="js/vocabulary.js?v=20260909a"></script>
-    <script src="js/daily-english.js?v=20260909a"></script>
-    <script src="js/almanac.js?v=20260909a"></script>
-    <script src="js/weather.js?v=20260909a"></script>
-    <script src="js/news.js?v=20260909a"></script>
-    <script src="js/todo.js?v=20260909a"></script>
-    <script src="js/mood.js?v=20260909a"></script>
-    <script src="js/home.js?v=20260909a"></script>
-    <script src="js/home-layout.js?v=20260909a"></script>
-    <script src="js/data-io.js?v=20260909a"></script>
+    <script src="js/api.js?v=20260909b"></script>
+    <script src="js/vocabulary.js?v=20260909b"></script>
+    <script src="js/daily-english.js?v=20260909b"></script>
+    <script src="js/almanac.js?v=20260909b"></script>
+    <script src="js/weather.js?v=20260909b"></script>
+    <script src="js/news.js?v=20260909b"></script>
+    <script src="js/todo.js?v=20260909b"></script>
+    <script src="js/mood.js?v=20260909b"></script>
+    <script src="js/home.js?v=20260909b"></script>
+    <script src="js/home-layout.js?v=20260909b"></script>
+    <script src="js/fitness.js?v=20260909b"></script>
+    <script src="js/data-io.js?v=20260909b"></script>
     <!-- Supabase 云同步（需先在 config.js 配置并建表，见 SUPABASE_SETUP.md） -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/cloud-sync.js?v=20260909a"></script>
-    <script src="js/app.js?v=20260909a"></script>
+    <script src="js/cloud-sync.js?v=20260909b"></script>
+    <script src="js/app.js?v=20260909b"></script>
 </body>
 </html>

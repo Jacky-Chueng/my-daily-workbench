@@ -27,8 +27,8 @@ const CloudSync = (() => {
     let statusEl = null;
     let cloudEmpty = true;        // 上次 pull 时云端是否为空（用于首设备播种）
 
-    // 同步的用户数据：生词 / 待办 / 心情 / 首页布局
-    const SYNC_KEYS = [KEYS.vocabulary, KEYS.todos, KEYS.moods, KEYS.homeLayout];
+    // 同步的用户数据：生词 / 待办 / 心情 / 首页布局 / 训练
+    const SYNC_KEYS = [KEYS.vocabulary, KEYS.todos, KEYS.moods, KEYS.homeLayout, KEYS.fitness];
 
     /* ---------- 状态提示 ---------- */
     function setStatus(state, text) {
@@ -86,9 +86,38 @@ const CloudSync = (() => {
             return mergeTodos(local || [], remote || []);
         if (key === KEYS.moods)
             return mergeMoods(local || {}, remote || {});
+        if (key === KEYS.fitness)
+            return mergeFitness(local, remote);
         if (key === KEYS.homeLayout)
             return remote;   // 布局偏好：last-write-wins（云端覆盖本地）
         return remote;
+    }
+
+    /* 训练模块：分区合并
+       - 目标 / 训练日：设置类，远端优先
+       - 佳明数据 / 每日建议：比时间戳，晚的赢（由自动化在一台机器上写入）
+       - 训练日志：按「日期 + 类型」union 去重，两端都不丢
+       - 临时加练请求：本地 pending 优先保留，避免被旧数据覆盖导致请求丢失 */
+    function mergeFitness(local, remote) {
+        const l = local || {}, r = remote || {};
+        const out = { ...l };
+        if (r.goal !== undefined) out.goal = r.goal;
+        if (r.trainingDays !== undefined) out.trainingDays = r.trainingDays;
+
+        const ts2 = x => (x && (x.updatedAt || x.generatedAt || x.date ? (x.updatedAt || x.generatedAt || 0) : 0)) || 0;
+        if (r.metrics !== undefined) out.metrics = ts2(r.metrics) >= ts2(l.metrics) ? r.metrics : l.metrics;
+        if (r.advice !== undefined) out.advice = ts2(r.advice) >= ts2(l.advice) ? r.advice : l.advice;
+
+        const logs = [...(l.logs || []), ...(r.logs || [])];
+        const seen = new Map();
+        logs.forEach(x => { if (x) seen.set(String(x.date) + "|" + String(x.type), x); });
+        out.logs = Array.from(seen.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+        if (l.adHoc && l.adHoc.status === "pending") {
+            out.adHoc = (!r.adHoc || (r.adHoc.requestedAt || 0) < (l.adHoc.requestedAt || 0)) ? l.adHoc : r.adHoc;
+        } else if (r.adHoc !== undefined) out.adHoc = r.adHoc;
+
+        return out;
     }
 
     /* 取"更晚发生的那条"：所有增删改都会打 updatedAt 时间戳 */

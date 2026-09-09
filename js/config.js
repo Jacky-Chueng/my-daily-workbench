@@ -167,6 +167,7 @@ window.APP_CONFIG = {
         moods: "dw_moods",
         theme: "dw_theme",
         articleIndex: "dw_article_idx_",
-        homeLayout: "dw_home_layout"     // 首页自定义布局（排序+显隐）
+        homeLayout: "dw_home_layout",    // 首页自定义布局（排序+显隐）
+        fitness: "dw_fitness"            // 训练模块：目标 / 训练日 / 佳明数据 / 每日建议
     }
 };

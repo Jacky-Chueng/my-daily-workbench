@@ -148,6 +148,7 @@
                 Todo.refresh();
                 Mood.refresh();
                 Home.refresh();
+                Fitness.refresh();
                 SidebarStats.refresh();
                 setTimeout(() => Api.showToast("已刷新 ✨", "success"), 800);
             } finally {
@@ -193,6 +194,7 @@
         Mood.init();
         Home.init();
         HomeLayout.init();   // 首页自定义布局（需在 CloudSync 之前注册同步监听）
+        Fitness.init();      // 训练建议（目标 / 训练日 / 佳明数据 / 今日课表）
         DataIO.init();
 
         // 同步侧边栏统计
