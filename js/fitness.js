@@ -711,7 +711,11 @@ const Fitness = (() => {
             const dObj = parseDate(p.date);
             const label = dObj ? `${dObj.getMonth() + 1}月${dObj.getDate()}日 · 周${WEEK_NAMES[p.wd]}` : p.date;
             const isToday = p.date === t;
-            const meta = item.km ? `${item.km} km${item.pace ? " · " + item.pace + "/km" : ""}` : "—";
+            // 云端 plan 的 pace 是「秒/公里」数字，本地 generatePlan 已是格式化字符串，统一处理
+            const paceStr = item.pace != null
+                ? (typeof item.pace === "number" ? fmtPace(item.pace) : item.pace)
+                : null;
+            const meta = item.km ? `${item.km} km${paceStr ? " · " + paceStr + "/km" : ""}` : "—";
             const overloadFlag = (p.flags && p.flags.length) ? true : item.overload;
             return `<div class="fit-plan-day ${isToday ? "today" : ""} ${overloadFlag ? "overload" : ""}" data-date="${p.date}">
                 <div class="fit-plan-row">
@@ -981,7 +985,12 @@ const Fitness = (() => {
             setBtn.addEventListener("click", () => {
                 const box = els.settings();
                 renderSettings();
+                const wasHidden = box.classList.contains("hidden");
                 box.classList.toggle("hidden");
+                // 设置面板在卡片最底部（14 天计划下面），打开时滚到可视区，否则用户以为没反应
+                if (wasHidden) {
+                    box.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
             });
         }
         const mtBox = els.manualType();
