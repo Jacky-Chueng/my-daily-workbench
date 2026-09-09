@@ -206,25 +206,31 @@ const Fitness = (() => {
     }
 
     // 根据「今天是本周第几个训练日」分配课表类型
-    function sessionForSlot(slotIndex, phase, readiness) {
+    // totalSlots = 每周训练天数；长距离永远只放在**本周最后一个训练日**，避免连续两天都是长距离。
+    function sessionForSlot(slotIndex, phase, readiness, totalSlots) {
         if (readiness != null && readiness <= 3.5) return "rest";
-        const soft = readiness != null && readiness < 6.5;   // 状态一般 → 降强度
-        if (phase === "taper") return slotIndex === 0 ? "tempo" : (soft ? "recovery" : "easy");
+        const soft = readiness != null && readiness < 6.5;
+        const isLast = totalSlots > 1 && slotIndex === totalSlots - 1;
+        if (phase === "taper") {
+            return isLast ? "tempo" : (soft ? "recovery" : "easy");
+        }
         if (phase === "peak") {
+            if (isLast) return "long";
             if (slotIndex === 0) return soft ? "easy" : "interval";
             if (slotIndex === 1) return soft ? "easy" : "tempo";
             return "easy";
         }
         if (phase === "build") {
+            if (isLast) return "long";
             if (slotIndex === 0) return soft ? "tempo" : "interval";
             if (slotIndex === 1) return "tempo";
-            if (slotIndex === 2) return "long";
             return soft ? "recovery" : "easy";
         }
         // base
+        if (isLast) return "long";
         if (slotIndex === 0) return soft ? "easy" : "tempo";
-        if (slotIndex === 2 || slotIndex === 3) return "long";
-        return "easy";
+        if (slotIndex === 1) return "tempo";
+        return soft ? "recovery" : "easy";
     }
 
     function suggestWorkout(data) {
@@ -261,7 +267,7 @@ const Fitness = (() => {
             };
         }
 
-        let type = sessionForSlot(slotIndex, phase, r.score);
+        let type = sessionForSlot(slotIndex, phase, r.score, Math.max(days.length, 1));
         // 负荷过高 → 强制降量（ACWR > 1.3）
         let overload = false;
         if (lr && lr.ratio > 1.3) {
@@ -576,7 +582,7 @@ const Fitness = (() => {
                 continue;
             }
             const slot = trainingSlotFor(d, td) % totalSlots;
-            const type = sessionForSlot(slot, phase, null);
+            const type = sessionForSlot(slot, phase, null, totalSlots);
             const w = buildSession(type, paces, weeksOut, phase, null, lr);
             plan.push({
                 date: dateStr, wd, type, name: TYPES[type].name,
