@@ -212,7 +212,32 @@ const CloudSync = (() => {
         try {
             if (statusEl) statusEl.classList.add("spin");
             setStatus("syncing", "☁ 同步中…");
-            const payload = collectLocal();
+            const local = collectLocal();
+
+            // 读云端再合并，再整体写回。
+            // 直接 upsert 本地整包会把「本机没有的 key」抹掉——尤其新增 fitness 键时，
+            // 另一台仍跑旧代码的设备一 push，就会把云端 fitness 清空。
+            let payload = local;
+            try {
+                const { data } = await client
+                    .from("sync_data")
+                    .select("payload")
+                    .eq("id", CFG.syncId)
+                    .maybeSingle();
+                if (data && data.payload) {
+                    const remote = data.payload || {};
+                    const merged = {};
+                    SYNC_KEYS.forEach(k => {
+                        merged[k] = mergeOne(k, local[k], remote[k]);
+                    });
+                    // 云端里有、但本机 SYNC_KEYS 不认识的其它键也原样保留
+                    Object.keys(remote).forEach(k => {
+                        if (!(k in merged)) merged[k] = remote[k];
+                    });
+                    payload = merged;
+                }
+            } catch (e) { /* 读云端失败就退化为直接推本地 */ }
+
             const { error } = await client
                 .from("sync_data")
                 .upsert({ id: CFG.syncId, payload, updated_at: new Date().toISOString() });
