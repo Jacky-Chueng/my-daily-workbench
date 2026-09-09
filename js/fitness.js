@@ -738,14 +738,18 @@ const Fitness = (() => {
 
     // 推送到佳明：写 pushWorkout 请求，由守护进程调 push_workout.py 上传
     async function requestPushWorkout(dateStr) {
-        const plan = generatePlan(load(), 14);
+        const data = load();
+        // 优先用云端 plan（含正确配速），退回本地 generatePlan
+        const cloudPlan = (data.coaching && data.coaching.plan) || data.plan;
+        const plan = (Array.isArray(cloudPlan) && cloudPlan.length) ? cloudPlan : generatePlan(data, 14);
         const item = plan.find(p => p.date === dateStr);
         if (!item || item.type === "rest") { Api.showToast("休息日没有可推的课表", ""); return; }
-        if (!item.paceSec) { Api.showToast("这条课表没有配速，先去设置目标成绩", "error"); return; }
-        const data = load();
+        // 云端 plan 用 pace（秒/公里），本地用 paceSec，统一取秒数
+        const paceSec = item.pace != null ? item.pace : item.paceSec;
+        if (!paceSec || !item.km) { Api.showToast("这条课表没有配速/距离，先去设置目标成绩", "error"); return; }
         data.pushWorkout = {
             date: dateStr, name: item.name, type: item.type,
-            km: item.km, paceSec: Math.round(item.paceSec), detail: item.detail,
+            km: item.km, paceSec: Math.round(paceSec), detail: item.detail,
             requestedAt: Date.now(), status: "pending"
         };
         save(data);
