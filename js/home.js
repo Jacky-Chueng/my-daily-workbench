@@ -85,6 +85,7 @@ const Home = (() => {
         const item = items.find(t => t.id === id);
         if (item) {
             item.done = !item.done;
+            item.updatedAt = Date.now();
             if (item.done) item.completedAt = Date.now();
             Todo.save(items);
             renderTodo();
@@ -99,6 +100,7 @@ const Home = (() => {
             // 墓碑式删除：标记 _deleted，使其随云同步传到其他设备
             it._deleted = true;
             it._deletedAt = Date.now();
+            it.updatedAt = Date.now();   // 时间戳：合并时不会被别的设备旧副本盖掉
             Todo.save(items);
             renderTodo();
             Todo.refresh();

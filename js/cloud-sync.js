@@ -81,27 +81,77 @@ const CloudSync = (() => {
     /* ---------- 合并策略 ---------- */
     function mergeOne(key, local, remote) {
         if (key === KEYS.vocabulary)
-            return mergeArray(local || [], remote || [], w => (w.word || "").toLowerCase());
+            return mergeGeneric(local || [], remote || [], w => (w.word || "").toLowerCase());
         if (key === KEYS.todos)
-            return mergeArray(local || [], remote || [], t => t.id);
+            return mergeTodos(local || [], remote || []);
         if (key === KEYS.moods)
-            return mergeObject(local || {}, remote || {});
+            return mergeMoods(local || {}, remote || {});
         if (key === KEYS.homeLayout)
             return remote;   // 布局偏好：last-write-wins（云端覆盖本地）
         return remote;
     }
 
-    // 数组：先放本地（保留离线新增），远端按 key 覆盖（云端为准，含编辑/删除）
-    function mergeArray(localArr, remoteArr, keyFn) {
+    /* 取"更晚发生的那条"：所有增删改都会打 updatedAt 时间戳 */
+    function ts(it) {
+        return (it && (it.updatedAt || it.completedAt || 0)) || 0;
+    }
+    /* 两条冲突数据怎么取舍：
+       墓碑（_deleted）优先 —— "删除"是最强意图，绝不能被另一台设备的旧副本复活；
+       其余情况比时间戳，谁晚听谁的。 */
+    function mergePair(a, b) {
+        if (!a) return b;
+        if (!b) return a;
+        if (a._deleted && !b._deleted) return a;
+        if (b._deleted && !a._deleted) return b;
+        return ts(b) > ts(a) ? b : a;
+    }
+
+    // 通用数组：按 keyFn 分组，同组保留"更晚 / 已删除"的那条
+    function mergeGeneric(localArr, remoteArr, keyFn) {
         const map = new Map();
         localArr.forEach(it => { if (it != null) map.set(keyFn(it), it); });
-        remoteArr.forEach(it => { if (it != null) map.set(keyFn(it), it); });
+        remoteArr.forEach(it => {
+            if (it == null) return;
+            const k = keyFn(it);
+            map.set(k, map.has(k) ? mergePair(map.get(k), it) : it);
+        });
         return Array.from(map.values());
     }
 
-    // 对象（心情按日期）：远端覆盖同键，保留本地独有键
-    function mergeObject(localObj, remoteObj) {
-        return Object.assign({}, localObj, remoteObj);
+    /* 待办专用：两轮合并
+       第 1 轮按 id 合并 —— 正常情况（同一条两端 id 相同），勾选/编辑/删除都能同步。
+       第 2 轮按「文本 + 创建时间」折叠 —— 兜住历史遗留问题：
+         旧版本给没有 id 的旧数据"随机补 id"，两台电脑对同一条待办算出了不同 id，
+         按 id 合并就永远对不上，于是删除（墓碑）传不过去、条目还越同步越多。
+       内容指纹在任何设备上都相同，所以能把它们折叠成同一条。 */
+    function mergeTodos(localArr, remoteArr) {
+        const contentKey = t => (window.Todo && Todo.contentKey)
+            ? Todo.contentKey(t)
+            : (String((t && t.text) || "") + "|" + String((t && t.createdAt) || ""));
+
+        const byId = mergeGeneric(localArr, remoteArr, t => String((t && t.id) || ""));
+
+        const byContent = new Map();
+        for (const it of byId) {
+            if (it == null) continue;
+            const k = contentKey(it);
+            byContent.set(k, byContent.has(k) ? mergePair(byContent.get(k), it) : it);
+        }
+        return Array.from(byContent.values());
+    }
+
+    // 心情（按日期）：同键比时间戳；删除的用 _deletedAt，后发生的赢
+    function mergeMoods(localObj, remoteObj) {
+        const mts = x => (x && x._deleted)
+            ? ((x._deletedAt || x.savedAt) || 0)
+            : ((x && x.savedAt) || 0);
+        const out = { ...localObj };
+        Object.keys(remoteObj || {}).forEach(k => {
+            const lv = localObj[k], rv = remoteObj[k];
+            if (lv == null) { out[k] = rv; return; }
+            out[k] = mts(rv) > mts(lv) ? rv : lv;
+        });
+        return out;
     }
 
     /* ---------- 拉取云端 ---------- */

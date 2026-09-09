@@ -25,18 +25,58 @@ const Todo = (() => {
         return "t_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7);
     }
 
+    /* ---------- 内容指纹：同一条待办在任何设备上算出的结果都相同 ----------
+       旧版本给"没有 id 的历史数据"随机补 id，导致两台电脑对同一条待办
+       算出了不同的 id → 云端按 id 合并时对不上 → 删除（墓碑）传不过去。
+       改成用「文本 + 创建时间」算出确定性 id，多设备才能对上同一条。 */
+    function contentKey(t) {
+        return String((t && t.text) || "") + "|" + String((t && t.createdAt) || "");
+    }
+    function stableId(text, createdAt) {
+        const s = String(text || "") + "|" + String(createdAt || "");
+        let h = 5381;
+        for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+        return "L" + h.toString(36) + "_" + s.length.toString(36);
+    }
+
     function load() {
         const items = Api.store.get(KEY, []);
         return items.map((it, idx) => {
             if (!it || typeof it !== "object") return it;
             const copy = { ...it };
-            if (!copy.id) copy.id = uid();
+            if (!copy.id) copy.id = stableId(copy.text, copy.createdAt);
             // 手动排序字段：缺失时按数组顺序兜底（写入后才持久化）
             if (typeof copy.sortOrder !== "number") copy.sortOrder = idx;
             return copy;
         });
     }
     function save(items) { Api.store.set(KEY, items); }
+
+    /* ---------- 自愈：合并"同内容不同 id"的重复项 ----------
+       把历史上已经产生的重复条目折叠成一条（墓碑优先，保留删除状态） */
+    function dedupe() {
+        const items = load();
+        const map = new Map();
+        let dupes = 0;
+        for (const it of items) {
+            const k = contentKey(it);
+            const prev = map.get(k);
+            if (!prev) { map.set(k, it); continue; }
+            dupes++;
+            map.set(k, mergeTwo(prev, it));
+        }
+        if (dupes) save(Array.from(map.values()));
+        return { removed: dupes, remaining: map.size };
+    }
+
+    /* 两条同一内容的待办怎么取舍：墓碑优先（删除不该被旧副本复活），否则取更新的 */
+    function mergeTwo(a, b) {
+        if (a._deleted && !b._deleted) return a;
+        if (b._deleted && !a._deleted) return b;
+        const ta = a.updatedAt || a.completedAt || 0;
+        const tb = b.updatedAt || b.completedAt || 0;
+        return tb > ta ? b : a;
+    }
 
     /* ---------- 迁移旧版按天存储数据（补齐 id）---------- */
     function migrateLegacy() {
@@ -143,7 +183,7 @@ const Todo = (() => {
         const maxOrder = items
             .filter(i => !i.done && !i._deleted)
             .reduce((m, i) => Math.max(m, i.sortOrder || 0), -1);
-        items.push({ id: uid(), text, done: false, createdAt: Date.now(), sortOrder: maxOrder + 1 });
+        items.push({ id: uid(), text, done: false, createdAt: Date.now(), updatedAt: Date.now(), sortOrder: maxOrder + 1 });
         save(items);
         render();
     }
@@ -153,6 +193,7 @@ const Todo = (() => {
         const it = items.find(x => x.id === id);
         if (!it) return;
         it.done = !it.done;
+        it.updatedAt = Date.now();
         if (it.done) it.completedAt = Date.now();
         save(items);
         render();
@@ -165,6 +206,7 @@ const Todo = (() => {
         // 墓碑式删除：不打断数组，仅标记 _deleted，使其能随同步传到其他设备
         it._deleted = true;
         it._deletedAt = Date.now();
+        it.updatedAt = Date.now();   // 让"删除"这个动作有时间戳，合并时不会被旧副本盖掉
         save(items);
         render();
     }
@@ -183,7 +225,7 @@ const Todo = (() => {
         }
         const items = load();
         const it = items.find(x => x.id === id);
-        if (it) it.text = val;
+        if (it) { it.text = val; it.updatedAt = Date.now(); }
         editingId = null;
         save(items);
         render();
@@ -195,16 +237,33 @@ const Todo = (() => {
         render();
     }
 
-    /* ---------- 物理清理：永久删除所有墓碑 _deleted 项 ----------
-       墓碑原本是为跨设备同步删除而保留的；清理后云端也会被覆盖（不再有这些项） */
+    /* ---------- 物理清理：永久删除"老"墓碑 ----------
+       墓碑是跨设备同步删除用的证据，所以近期删除的先留 3 天，
+       确保另一台电脑有机会同步到"删除"，不会被它手里的旧副本复活。 */
+    const TOMB_KEEP_MS = 3 * 24 * 60 * 60 * 1000;
+
+    // 注意：必须传入同一份 items 来统计，否则 load() 每次返回新副本、对象引用不同，过滤会失效
+    function tombStats(items) {
+        const list = items || load();
+        const now = Date.now();
+        const all = list.filter(t => t._deleted);
+        return {
+            old: all.filter(t => (now - (t._deletedAt || 0)) > TOMB_KEEP_MS),
+            recent: all.filter(t => (now - (t._deletedAt || 0)) <= TOMB_KEEP_MS)
+        };
+    }
+
     function purgeDeleted() {
         const items = load();
-        const tombstones = items.filter(t => t._deleted);
-        if (!tombstones.length) return { removed: 0, remaining: items.length };
-        const kept = items.filter(t => !t._deleted);
+        const { old, recent } = tombStats(items);
+        if (!old.length) {
+            return { removed: 0, remaining: items.length, kept: recent.length };
+        }
+        const oldSet = new Set(old);   // 与 items 同源，引用一致
+        const kept = items.filter(t => !oldSet.has(t));
         save(kept);
         render();
-        return { removed: tombstones.length, remaining: kept.length };
+        return { removed: old.length, remaining: kept.length, kept: recent.length };
     }
 
     /* ---------- 拖拽排序（鼠标 + 触屏通用，靠手柄发起）---------- */
@@ -277,6 +336,9 @@ const Todo = (() => {
     /* ---------- 初始化 ---------- */
     function init() {
         migrateLegacy(); // 先迁移旧数据
+        // 自愈：折叠历史遗留的"同内容不同 id"重复项，让多端能对上同一条
+        const d = dedupe();
+        if (d.removed) console.log(`[待办去重] 合并了 ${d.removed} 条重复项，剩余 ${d.remaining} 条`);
         const form = els.form();
         if (form) {
             form.addEventListener("submit", e => {
@@ -290,9 +352,17 @@ const Todo = (() => {
         const purgeBtn = document.getElementById("todoPurgeBtn");
         if (purgeBtn) {
             purgeBtn.addEventListener("click", () => {
-                const n = load().filter(t => t._deleted).length;
-                if (!n) { Api.showToast("没有可清理的已删除项", ""); return; }
-                if (!confirm(`将永久清理 ${n} 条已删除的待办（云端也会同步清理），确定吗？`)) return;
+                const { old, recent } = tombStats();
+                if (!old.length) {
+                    Api.showToast(recent.length
+                        ? `暂无可清理项：${recent.length} 条是 3 天内删除的，需保留以确保其他设备同步到删除`
+                        : "没有可清理的已删除项", "");
+                    return;
+                }
+                if (!confirm(
+                    `将永久清理 ${old.length} 条「3 天前删除」的待办，云端也会同步清理。\n\n`
+                    + `另有 ${recent.length} 条是近期删除的，先保留 3 天，确保另一台电脑能同步到删除。`
+                )) return;
                 const r = purgeDeleted();
                 // 立刻把清理后的本地数据推到云端，避免被残留的云端墓碑"复活"
                 if (window.CloudSync && CloudSync.flushNow) CloudSync.flushNow();
@@ -309,5 +379,5 @@ const Todo = (() => {
 
     function refresh() { render(); }
 
-    return { init, refresh, add, load, save, purgeDeleted };
+    return { init, refresh, add, load, save, purgeDeleted, dedupe, contentKey, mergeTwo };
 })();

@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的每日学习工作台</title>
     <meta name="description" content="每日英语学习、黄历、每日要闻、待办事项与心情记录一站式工作台">
-    <link rel="stylesheet" href="css/styles.css">
-    <script src="js/config.js"></script>
+    <!-- 版本号：每次 push 前把 ?v= 后面改一下（如 20260909a → 20260910b），
+         否则 GitHub Pages 有 10 分钟缓存，刷新可能看不到最新改动 -->
+    <link rel="stylesheet" href="css/styles.css?v=20260909a">
+    <script src="js/config.js?v=20260909a"></script>
 </head>
 <body>
     <!-- 顶部导航栏 -->
@@ -295,20 +297,20 @@
     <div id="toast" class="toast hidden"></div>
 
     <!-- 模块脚本（顺序加载） -->
-    <script src="js/api.js"></script>
-    <script src="js/vocabulary.js"></script>
-    <script src="js/daily-english.js"></script>
-    <script src="js/almanac.js"></script>
-    <script src="js/weather.js"></script>
-    <script src="js/news.js"></script>
-    <script src="js/todo.js"></script>
-    <script src="js/mood.js"></script>
-    <script src="js/home.js"></script>
-    <script src="js/home-layout.js"></script>
-    <script src="js/data-io.js"></script>
+    <script src="js/api.js?v=20260909a"></script>
+    <script src="js/vocabulary.js?v=20260909a"></script>
+    <script src="js/daily-english.js?v=20260909a"></script>
+    <script src="js/almanac.js?v=20260909a"></script>
+    <script src="js/weather.js?v=20260909a"></script>
+    <script src="js/news.js?v=20260909a"></script>
+    <script src="js/todo.js?v=20260909a"></script>
+    <script src="js/mood.js?v=20260909a"></script>
+    <script src="js/home.js?v=20260909a"></script>
+    <script src="js/home-layout.js?v=20260909a"></script>
+    <script src="js/data-io.js?v=20260909a"></script>
     <!-- Supabase 云同步（需先在 config.js 配置并建表，见 SUPABASE_SETUP.md） -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/cloud-sync.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/cloud-sync.js?v=20260909a"></script>
+    <script src="js/app.js?v=20260909a"></script>
 </body>
 </html>
