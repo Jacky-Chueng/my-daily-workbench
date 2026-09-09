@@ -45,6 +45,7 @@ const Fitness = (() => {
         workout: () => document.getElementById("fitWorkout"),
         week: () => document.getElementById("fitWeek"),
         stats: () => document.getElementById("fitStats"),
+        plan: () => document.getElementById("fitPlan"),
         countdown: () => document.getElementById("fitnessCountdown"),
         settings: () => document.getElementById("fitSettings"),
         syncBtn: () => document.getElementById("fitSyncBtn"),
@@ -356,6 +357,10 @@ const Fitness = (() => {
         const st = els.stats();
         if (st) st.innerHTML = renderStatsHtml(data);
 
+        // 未来两周计划
+        const pl = els.plan();
+        if (pl) pl.innerHTML = renderPlanHtml(data);
+
         // 同步状态提示
         const h = els.syncHint();
         if (h) {
@@ -532,6 +537,125 @@ const Fitness = (() => {
             const d = parseDate(l.date);
             return d && d >= cutoff;
         }).length;
+    }
+
+    /* ---------- 未来 N 天计划 ---------- */
+    function pad2(n) { return String(n).padStart(2, "0"); }
+
+    // 某天是本周第几个训练日（0 起），用于分配课表类型（保持每周轮换）
+    function trainingSlotFor(date, td) {
+        const wd = date.getDay();
+        const monday = new Date(date);
+        monday.setDate(date.getDate() - ((wd + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+        let slot = -1;
+        for (let j = 0; j < 7; j++) {
+            const c = new Date(monday); c.setDate(monday.getDate() + j);
+            if (c > date) break;
+            if (td.includes(c.getDay())) slot++;
+        }
+        return Math.max(slot, 0);
+    }
+
+    function generatePlan(data, days) {
+        const goal = data.goal || null;
+        const paces = pacesFromGoal(goal);
+        const weeksOut = goal && goal.raceDate ? (daysUntil(goal.raceDate) != null ? daysUntil(goal.raceDate) / 7 : null) : null;
+        const phase = planPhase(weeksOut);
+        const td = Array.isArray(data.trainingDays) ? data.trainingDays.slice().sort((a, b) => a - b) : [];
+        const lr = loadRatio(data.logs);
+        const totalSlots = Math.max(td.length, 1);
+        const plan = [];
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        for (let i = 0; i < days; i++) {
+            const d = new Date(today); d.setDate(today.getDate() + i);
+            const dateStr = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+            const wd = d.getDay();
+            if (!td.includes(wd)) {
+                plan.push({ date: dateStr, wd, type: "rest", name: "休息", km: 0, paceSec: null, pace: null, detail: "休息日。散步 20-30 分钟、拉伸或核心力量都行。" });
+                continue;
+            }
+            const slot = trainingSlotFor(d, td) % totalSlots;
+            const type = sessionForSlot(slot, phase, null);
+            const w = buildSession(type, paces, weeksOut, phase, null, lr);
+            plan.push({
+                date: dateStr, wd, type, name: TYPES[type].name,
+                km: w.km || 0,
+                paceSec: (typeof w.pace === "number") ? w.pace : null,
+                pace: (typeof w.pace === "number") ? fmtPace(w.pace) : null,
+                detail: w.detail
+            });
+        }
+        return plan;
+    }
+
+    function renderPlanHtml(data) {
+        const plan = generatePlan(data, 14);
+        const t = todayStr();
+        const rows = plan.map(p => {
+            const T = TYPES[p.type] || TYPES.easy;
+            const dObj = parseDate(p.date);
+            const label = dObj ? `${dObj.getMonth() + 1}月${dObj.getDate()}日 · 周${WEEK_NAMES[p.wd]}` : p.date;
+            const isToday = p.date === t;
+            const meta = p.km ? `${p.km} km${p.pace ? " · " + p.pace + "/km" : ""}` : "—";
+            return `<div class="fit-plan-day ${isToday ? "today" : ""}" data-date="${p.date}">
+                <div class="fit-plan-row">
+                    <span class="fit-plan-date">${label}${isToday ? " <b>今天</b>" : ""}</span>
+                    <span class="fit-plan-type t-${p.type}">${T.icon} ${escapeHtml(p.name)}</span>
+                    <span class="fit-plan-meta">${meta}</span>
+                    <span class="fit-plan-caret">▾</span>
+                </div>
+                <div class="fit-plan-detail hidden">
+                    <div class="fit-plan-detail-text">${escapeHtml(p.detail)}</div>
+                    ${p.type !== "rest" ? `<button class="fit-plan-push btn btn-ghost btn-xs" data-date="${p.date}" type="button" title="推到佳明 Connect，同步后手表上跟着练">⌚ 推到佳明</button>` : ""}
+                </div>
+            </div>`;
+        }).join("");
+        return `<div class="fit-plan-head">未来两周计划 <span class="fit-plan-sub">点开某天看课表，可推到手表</span></div><div class="fit-plan-list">${rows}</div>`;
+    }
+
+    // 推送到佳明：写 pushWorkout 请求，由守护进程调 push_workout.py 上传
+    async function requestPushWorkout(dateStr) {
+        const plan = generatePlan(load(), 14);
+        const item = plan.find(p => p.date === dateStr);
+        if (!item || item.type === "rest") { Api.showToast("休息日没有可推的课表", ""); return; }
+        if (!item.paceSec) { Api.showToast("这条课表没有配速，先去设置目标成绩", "error"); return; }
+        const data = load();
+        data.pushWorkout = {
+            date: dateStr, name: item.name, type: item.type,
+            km: item.km, paceSec: Math.round(item.paceSec), detail: item.detail,
+            requestedAt: Date.now(), status: "pending"
+        };
+        save(data);
+        // 写云端
+        const c = supabaseClient();
+        if (c) {
+            try {
+                const syncId = (window.APP_CONFIG.supabase.syncId || "main");
+                const { data: rows } = await c.from("sync_data").select("payload").eq("id", syncId).maybeSingle();
+                const payload = (rows && rows.payload) || {};
+                const fit = payload.fitness || {};
+                fit.pushWorkout = data.pushWorkout;
+                payload.fitness = fit;
+                await c.from("sync_data").upsert({ id: syncId, payload, updated_at: new Date().toISOString() });
+            } catch (e) { console.error("pushWorkout 写云端失败:", e); }
+        }
+        Api.showToast("已提交，稍后会推到你佳明的训练计划里（去手表/App 同步后即可跟着练）", "success");
+    }
+
+    function bindPlanEvents() {
+        const box = els.plan();
+        if (!box || box._bound) return;
+        box._bound = true;
+        box.addEventListener("click", e => {
+            const pushBtn = e.target.closest(".fit-plan-push");
+            if (pushBtn) { e.stopPropagation(); requestPushWorkout(pushBtn.dataset.date); return; }
+            const day = e.target.closest(".fit-plan-day");
+            if (day) {
+                const detail = day.querySelector(".fit-plan-detail");
+                if (detail) detail.classList.toggle("hidden");
+            }
+        });
     }
 
     function fmtTime(ts) {
@@ -747,6 +871,7 @@ const Fitness = (() => {
     /* ================= 初始化 ================= */
     function init() {
         render();
+        bindPlanEvents();
         // 打开页面就从云端拉一次 fitness，确保显示最新（不依赖 CloudSync 的 Realtime）
         refreshFromCloud();
         document.addEventListener("dw:dataChanged", e => {
