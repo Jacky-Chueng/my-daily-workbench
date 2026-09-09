@@ -399,8 +399,15 @@ const Fitness = (() => {
         bindEvents();
     }
 
+    // 今天的权威算法结果（由 coach.py 每天算好写入 Supabase）
+    function getTodayCoaching(data) {
+        const c = data.coaching;
+        return (c && c.date === todayStr()) ? c : null;
+    }
+
     function renderTodayHtml(data, today) {
         const m = data.metrics && data.metrics.date === today ? data.metrics : null;
+        const coaching = getTodayCoaching(data);
         if (!m) {
             return `<div class="fit-empty">
                 <div class="fit-empty-icon">⌚</div>
@@ -408,10 +415,16 @@ const Fitness = (() => {
                 <div class="fit-empty-hint">佳明数据由 WorkBuddy 每天早上自动拉取并同步过来。<br>没配的话跟我说一声「配一下佳明」就行。</div>
             </div>`;
         }
-        const r = computeReadiness(m);
-        const pct = r.score != null ? (r.score / 10) * 100 : 0;
-        const tone = r.score == null ? "" : (r.score >= 7.5 ? "good" : r.score >= 5.5 ? "ok" : "bad");
-        const label = r.score == null ? "—" : (r.score >= 7.5 ? "状态良好" : r.score >= 6.5 ? "可按计划执行" : r.score >= 4 ? "建议降量" : "建议休息");
+        // 优先用 coach.py 的权威结果（coaching），否则本地近似
+        const local = computeReadiness(m);
+        const score = coaching ? coaching.readiness : local.score;
+        const pct = score != null ? (score / 10) * 100 : 0;
+        const tone = score == null ? "" : (score >= 7.5 ? "good" : score >= 5.5 ? "ok" : "bad");
+        const verdictMap = { excellent: "状态极佳", normal: "状态正常", fatigued: "略疲劳", rest: "需要休息" };
+        const label = coaching ? (verdictMap[coaching.verdict] || "—")
+            : (score == null ? "—" : (score >= 7.5 ? "状态良好" : score >= 6.5 ? "可按计划执行" : score >= 4 ? "建议降量" : "建议休息"));
+        const notes = coaching ? (coaching.readinessNotes || []) : local.notes;
+        const inputs = coaching ? coaching.readinessInputs : local.inputs;
 
         // 关键指标（含与基线的相对箭头）
         const trend = (val, base) => {
@@ -431,12 +444,12 @@ const Fitness = (() => {
         return `
         <div class="fit-readiness ${tone}">
             <div class="fit-readiness-num-wrap">
-                <span class="fit-readiness-num">${r.score != null ? r.score : "—"}</span><span class="fit-readiness-max">/ 10</span>
+                <span class="fit-readiness-num">${score != null ? score : "—"}</span><span class="fit-readiness-max">/ 10</span>
             </div>
             <div class="fit-readiness-meta">
-                <div class="fit-readiness-label">${label}${r.inputs ? ` <span>· ${r.inputs} 项数据</span>` : ""}</div>
+                <div class="fit-readiness-label">${label}${inputs ? ` <span>· ${inputs} 项数据</span>` : ""}</div>
                 <div class="fit-bar"><i style="width:${pct}%"></i></div>
-                ${r.notes.length ? `<div class="fit-notes">${r.notes.map(n => escapeHtml(n)).join(" · ")}</div>` : ""}
+                ${notes.length ? `<div class="fit-notes">${notes.map(n => escapeHtml(n)).join(" · ")}</div>` : ""}
             </div>
         </div>
         <div class="fit-metrics">
@@ -451,16 +464,32 @@ const Fitness = (() => {
         const s = suggestWorkout(data);
         const T = TYPES[s.type] || TYPES.easy;
         const advice = data.advice && data.advice.date === today ? data.advice : null;
-        const w = (advice && advice.workout) || {};
-        const tone = w.tone || T.tone;
-        const type = w.type || s.type;
-        const name = (advice && advice.headline) || s.headline;
-        const km = w.km || s.km;
-        const pace = w.pace || s.pace;
-        const isFallback = !advice;
+        const coaching = getTodayCoaching(data);
 
-        const flags = (w && Array.isArray(w.flags)) ? w.flags : (s.overload && s.load ? [`负荷比 ${s.load.ratio.toFixed(2)} 超出安全区 0.8-1.3`] : []);
-        const detailText = (advice && advice.detail) || s.detail || "";
+        // 优先：coach.py 的权威课表 → 其次：WorkBuddy 写的 advice → 最后：本地兜底
+        let w, tone, type, name, km, pace, flags, detailText, isFallback;
+        if (coaching && coaching.session) {
+            const cs = coaching.session;
+            const CT = TYPES[cs.type] || TYPES.easy;
+            w = cs; tone = cs.tone || CT.tone; type = cs.type;
+            name = cs.name || CT.name; km = cs.km; pace = cs.pace;
+            flags = coaching.flags || [];
+            detailText = cs.detail || "";
+            isFallback = false;
+        } else if (advice) {
+            w = advice.workout || {};
+            tone = w.tone || T.tone; type = w.type || s.type;
+            name = advice.headline || w.name || T.name; km = w.km || s.km; pace = w.pace || s.pace;
+            flags = (w && Array.isArray(w.flags)) ? w.flags : [];
+            detailText = advice.detail || "";
+            isFallback = false;
+        } else {
+            w = {}; tone = T.tone; type = s.type;
+            name = s.headline || T.name; km = s.km; pace = s.pace;
+            flags = (s.overload && s.load) ? [`负荷比 ${s.load.ratio.toFixed(2)} 超出安全区 0.8-1.3`] : [];
+            detailText = s.detail || "";
+            isFallback = true;
+        }
 
         return `
         <div class="fit-session tone-${tone}">
@@ -470,11 +499,11 @@ const Fitness = (() => {
             </div>
             <div class="fit-session-hero">
                 ${km ? `<div class="fit-session-distance">${km}<small>km</small></div>` : `<div class="fit-session-distance">—</div>`}
-                ${pace ? `<div class="fit-session-pace">${pace ? (typeof pace === "number" ? fmtPace(pace) : escapeHtml(String(pace))) : ""}<small>/km</small></div>` : ""}
+                ${pace ? `<div class="fit-session-pace">${typeof pace === "number" ? fmtPace(pace) : escapeHtml(String(pace))}<small>/km</small></div>` : ""}
             </div>
             <div class="fit-session-detail">${escapeHtml(detailText).replace(/\n/g, "<br>")}</div>
             ${flags.length ? `<div class="fit-warn">⚠ ${flags.map(escapeHtml).join(" · ")}</div>` : ""}
-            ${isFallback ? `<div class="fit-session-src">本地规则估算（今天的佳明建议还没出来）</div>` : ""}
+            ${isFallback ? `<div class="fit-session-src">本地规则估算（今天的 coach 结果还没出来）</div>` : ""}
         </div>`;
     }
 
@@ -503,8 +532,13 @@ const Fitness = (() => {
         const km28 = m && m.last28Km != null ? m.last28Km : (countKm(data.logs, 28) || 0);
         const runCount7 = m && m.runCount7 != null ? m.runCount7 : (countRuns(data.logs, 7) || 0);
         const lr = loadRatio(data.logs || []);
-        const acwr = lr && lr.ratio ? lr.ratio.toFixed(2) : "—";
-        const acwrTone = !lr ? "" : (lr.ratio > 1.3 ? "bad" : lr.ratio < 0.8 ? "ok" : "good");
+        const coaching = getTodayCoaching(data);
+        const acwr = coaching && coaching.load && coaching.load.acwr != null
+            ? coaching.load.acwr
+            : (lr && lr.ratio ? lr.ratio.toFixed(2) : "—");
+        const acwrTone = (coaching && coaching.load && coaching.load.acwr != null)
+            ? (coaching.load.acwr > 1.3 ? "bad" : coaching.load.acwr < 0.8 ? "ok" : "good")
+            : (!lr ? "" : (lr.ratio > 1.3 ? "bad" : lr.ratio < 0.8 ? "ok" : "good"));
 
         return `<div class="fit-stats">
             <div class="fit-stat">
@@ -598,19 +632,31 @@ const Fitness = (() => {
     function renderPlanHtml(data) {
         const plan = generatePlan(data, 14);
         const t = todayStr();
-        // 今天这一行用 suggestWorkout（已考虑 ACWR 负荷比/adHoc）——和上方"今日课表"卡保持一致
+        // 今天这一行用 coach 的权威结果（已考虑准备度 + ACWR），否则退回 suggestWorkout
+        const coaching = getTodayCoaching(data);
         const todaySuggested = suggestWorkout(data);
         const rows = plan.map(p => {
             let item;
             if (p.date === t) {
-                item = {
-                    type: todaySuggested.type,
-                    name: todaySuggested.headline,
-                    km: todaySuggested.km || 0,
-                    pace: typeof todaySuggested.pace === "number" ? fmtPace(todaySuggested.pace) : (todaySuggested.pace || null),
-                    detail: todaySuggested.detail || p.detail,
-                    overload: todaySuggested.overload
-                };
+                if (coaching && coaching.session) {
+                    item = {
+                        type: coaching.session.type,
+                        name: coaching.session.name,
+                        km: coaching.session.km || 0,
+                        pace: coaching.session.pace != null ? fmtPace(coaching.session.pace) : null,
+                        detail: coaching.session.detail || p.detail,
+                        overload: (coaching.flags || []).length > 0
+                    };
+                } else {
+                    item = {
+                        type: todaySuggested.type,
+                        name: todaySuggested.headline,
+                        km: todaySuggested.km || 0,
+                        pace: typeof todaySuggested.pace === "number" ? fmtPace(todaySuggested.pace) : (todaySuggested.pace || null),
+                        detail: todaySuggested.detail || p.detail,
+                        overload: todaySuggested.overload
+                    };
+                }
             } else {
                 item = p;
             }
