@@ -609,10 +609,45 @@ const Fitness = (() => {
         Api.showToast("已记录：今天要练。建议已临时生成，我下次同步时会按你实际状态微调后续安排", "success");
     }
 
+    /* ================= 直连 Supabase 读 fitness =================
+       页面展示不再只依赖 CloudSync 的本地缓存 + Realtime（Realtime 没开时页面不会自动刷新），
+       这里直接用 supabase client 读云端 fitness，保证"打开/点同步后一定能看到最新数据"。 */
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function supabaseClient() {
+        const cfg = window.APP_CONFIG && window.APP_CONFIG.supabase;
+        if (!cfg || !cfg.enabled || !cfg.url || !window.supabase) return null;
+        return window.supabase.createClient(cfg.url, cfg.anonKey);
+    }
+
+    async function fetchCloudFitness() {
+        const c = supabaseClient();
+        if (!c) return null;
+        try {
+            const syncId = (window.APP_CONFIG.supabase.syncId || "main");
+            const { data, error } = await c.from("sync_data")
+                .select("payload").eq("id", syncId).maybeSingle();
+            if (error || !data || !data.payload) return null;
+            return data.payload.fitness || null;
+        } catch (e) { return null; }
+    }
+
+    // 用云端 fitness 覆盖本地并重渲染；返回是否有变化
+    async function refreshFromCloud() {
+        const cloud = await fetchCloudFitness();
+        if (!cloud) return false;
+        const local = load();
+        const merged = { ...local, ...cloud };
+        Api.store.set(KEY, merged);
+        render();
+        return true;
+    }
+
     /* ================= 同步佳明 =================
-       页面不能直连佳明（佳明 token 在本机），所以"点一下同步"的实现是：
-       把同步请求写进 Supabase 标记（syncRequest pending），
-       本机每 30 秒巡一次的守护进程会检测到并在 30 秒内拉取最新数据写回。 */
+       页面不能直连佳明（佳明 token 在本机），所以"点一下同步"：
+       1. 往 Supabase 写 syncRequest=pending
+       2. 本机守护进程每 30s 巡一次，发现 pending 就拉数据写回（并标 done）
+       3. 本页轮询云端，等 done 或 metrics 变化后自动刷新显示 */
     async function markSyncRequest() {
         const cfg = window.APP_CONFIG && window.APP_CONFIG.supabase;
         if (!cfg || !cfg.enabled || !cfg.url || !window.supabase) {
@@ -643,26 +678,46 @@ const Fitness = (() => {
         const btn = els.syncBtn();
         if (!btn) return;
         const orig = btn.textContent;
-        btn.disabled = true; btn.textContent = "请求中…";
         const showHint = (msg) => {
             const h = els.syncHint();
             if (!h) return;
             h.textContent = msg;
             h.classList.remove("hidden");
         };
-        // 本地存在就立即给个反馈；标记 pending 也会立刻反映到本页（云同步 Realtime）
+        btn.disabled = true; btn.textContent = "同步中…";
         showHint("已请求同步 · 通常 30 秒内到位");
+
         const r = await markSyncRequest();
-        btn.disabled = false; btn.textContent = orig;
         if (!r.ok) {
-            showHint("请求失败：" + (r.reason || "网络问题") + " · 试试告诉 WorkBuddy 手动拉一下");
+            btn.disabled = false; btn.textContent = orig;
+            showHint("请求失败：" + (r.reason || "网络问题"));
             Api.showToast("同步请求失败，建议直接说「同步一下佳明」", "error");
-        } else {
-            // 立刻在本地数据里也置一个 pending 标记，刷新会显示
-            const data = load();
-            data.syncRequest = { requestedAt: Date.now(), status: "pending" };
-            save(data);
+            return;
+        }
+
+        // 轮询云端，等守护进程把最新数据写回（最多 100 秒）
+        let synced = false;
+        for (let i = 0; i < 20; i++) {
+            await sleep(5000);
+            const cloud = await fetchCloudFitness();
+            if (!cloud) continue;
+            const local = load();
+            Api.store.set(KEY, { ...local, ...cloud });
             render();
+            const sr = cloud.syncRequest;
+            const metricsChanged = cloud.metrics && (!local.metrics || cloud.metrics.updatedAt !== local.metrics.updatedAt);
+            if ((sr && sr.status === "done") || metricsChanged) {
+                synced = true;
+                break;
+            }
+        }
+
+        btn.disabled = false; btn.textContent = orig;
+        if (synced) {
+            showHint("✓ 已同步最新数据");
+            Api.showToast("佳明数据已更新 ✨", "success");
+        } else {
+            showHint("暂时没拉到新数据 · 可稍后再点一次，或直接刷新页面");
         }
     }
 
@@ -692,13 +747,15 @@ const Fitness = (() => {
     /* ================= 初始化 ================= */
     function init() {
         render();
+        // 打开页面就从云端拉一次 fitness，确保显示最新（不依赖 CloudSync 的 Realtime）
+        refreshFromCloud();
         document.addEventListener("dw:dataChanged", e => {
             if (e.detail && e.detail.key === KEY) render();
         });
         document.addEventListener("dw:remoteSynced", render);
     }
 
-    function refresh() { render(); }
+    function refresh() { render(); refreshFromCloud(); }
 
     return { init, refresh, load, save, suggestWorkout, computeReadiness, pacesFromGoal };
 })();
