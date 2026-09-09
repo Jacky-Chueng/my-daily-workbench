@@ -592,22 +592,39 @@ const Fitness = (() => {
     function renderPlanHtml(data) {
         const plan = generatePlan(data, 14);
         const t = todayStr();
+        // 今天这一行用 suggestWorkout（已考虑 ACWR 负荷比/adHoc）——和上方"今日课表"卡保持一致
+        const todaySuggested = suggestWorkout(data);
         const rows = plan.map(p => {
-            const T = TYPES[p.type] || TYPES.easy;
+            let item;
+            if (p.date === t) {
+                item = {
+                    type: todaySuggested.type,
+                    name: todaySuggested.headline,
+                    km: todaySuggested.km || 0,
+                    pace: typeof todaySuggested.pace === "number" ? fmtPace(todaySuggested.pace) : (todaySuggested.pace || null),
+                    detail: todaySuggested.detail || p.detail,
+                    overload: todaySuggested.overload
+                };
+            } else {
+                item = p;
+            }
+            const T = TYPES[item.type] || TYPES.easy;
             const dObj = parseDate(p.date);
             const label = dObj ? `${dObj.getMonth() + 1}月${dObj.getDate()}日 · 周${WEEK_NAMES[p.wd]}` : p.date;
             const isToday = p.date === t;
-            const meta = p.km ? `${p.km} km${p.pace ? " · " + p.pace + "/km" : ""}` : "—";
-            return `<div class="fit-plan-day ${isToday ? "today" : ""}" data-date="${p.date}">
+            const meta = item.km ? `${item.km} km${item.pace ? " · " + item.pace + "/km" : ""}` : "—";
+            return `<div class="fit-plan-day ${isToday ? "today" : ""} ${item.overload ? "overload" : ""}" data-date="${p.date}">
                 <div class="fit-plan-row">
                     <span class="fit-plan-date">${label}${isToday ? " <b>今天</b>" : ""}</span>
-                    <span class="fit-plan-type t-${p.type}">${T.icon} ${escapeHtml(p.name)}</span>
+                    <span class="fit-plan-type t-${item.type}">${T.icon} ${escapeHtml(item.name)}</span>
                     <span class="fit-plan-meta">${meta}</span>
                     <span class="fit-plan-caret">▾</span>
                 </div>
                 <div class="fit-plan-detail hidden">
-                    <div class="fit-plan-detail-text">${escapeHtml(p.detail)}</div>
-                    ${p.type !== "rest" ? `<button class="fit-plan-push btn btn-ghost btn-xs" data-date="${p.date}" type="button" title="推到佳明 Connect，同步后手表上跟着练">⌚ 推到佳明</button>` : ""}
+                    <div class="fit-plan-detail-text">${escapeHtml(item.detail || "")}</div>
+                    ${item.overload ? `<div class="fit-warn" style="margin-top:6px">⚠ 负荷比过高，已自动降量（与上方"今日课表"一致）</div>` : ""}
+                    ${item.type !== "rest" && item.type !== "recovery" && !isToday ? `<button class="fit-plan-push btn btn-ghost btn-xs" data-date="${p.date}" type="button" title="推到佳明 Connect，同步后手表上跟着练">⌚ 推到佳明</button>` : ""}
+                    ${isToday && item.type !== "rest" && item.type !== "recovery" ? `<button class="fit-plan-push btn btn-ghost btn-xs" data-date="${p.date}" type="button" title="把今天降量后的课表推到手表">⌚ 推到佳明</button>` : ""}
                 </div>
             </div>`;
         }).join("");
