@@ -840,9 +840,34 @@ const Fitness = (() => {
         data.goal = { type, targetTime, raceDate, updatedAt: Date.now() };
         data.trainingDays = days;
         save(data);
+        // 关键：直接写云端，绕过 CloudSync 的合并（之前 null 覆盖 / 竞态导致目标被抹掉）
+        writeGoalToCloud(data.goal, days);
         els.settings().classList.add("hidden");
         render();
         Api.showToast("目标已保存，下次生成建议会按新目标来", "success");
+    }
+
+    // 把目标/训练日直接写进 Supabase（读-改-写，与 markSyncRequest 同一套路）
+    async function writeGoalToCloud(goal, trainingDays) {
+        const c = supabaseClient();
+        if (!c) return;
+        try {
+            const syncId = (window.APP_CONFIG.supabase.syncId || "main");
+            const { data: rows } = await c.from("sync_data")
+                .select("payload").eq("id", syncId).maybeSingle();
+            const payload = (rows && rows.payload) || {};
+            const fit = payload.fitness || {};
+            fit.goal = goal;
+            fit.trainingDays = trainingDays;
+            payload.fitness = fit;
+            const { error } = await c.from("sync_data").upsert({
+                id: syncId, payload, updated_at: new Date().toISOString()
+            });
+            if (error) console.warn("writeGoalToCloud error", error);
+            else console.log("[fitness] 目标已直写云端");
+        } catch (e) {
+            console.warn("writeGoalToCloud failed", e);
+        }
     }
 
     /* ================= 临时加练 ================= */
