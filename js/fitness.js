@@ -44,6 +44,7 @@ const Fitness = (() => {
         today: () => document.getElementById("fitToday"),
         workout: () => document.getElementById("fitWorkout"),
         week: () => document.getElementById("fitWeek"),
+        stats: () => document.getElementById("fitStats"),
         countdown: () => document.getElementById("fitnessCountdown"),
         settings: () => document.getElementById("fitSettings")
     };
@@ -349,6 +350,23 @@ const Fitness = (() => {
         const wk = els.week();
         if (wk) wk.innerHTML = renderWeekHtml(data, today);
 
+        // 近况
+        const st = els.stats();
+        if (st) st.innerHTML = renderStatsHtml(data);
+
+        // "去设置"链接
+        const goto = document.getElementById("fitWeekGoto");
+        if (goto && !goto._bound) {
+            goto._bound = true;
+            goto.addEventListener("click", e => {
+                e.preventDefault();
+                const box = els.settings();
+                renderSettings();
+                box.classList.remove("hidden");
+                box.scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+        }
+
         bindEvents();
     }
 
@@ -356,32 +374,47 @@ const Fitness = (() => {
         const m = data.metrics && data.metrics.date === today ? data.metrics : null;
         if (!m) {
             return `<div class="fit-empty">
-                <p>还没有今天的身体数据。</p>
-                <p class="fit-hint">佳明数据由 WorkBuddy 每天早上自动拉取并同步过来。
-                还没配置的话，跟我说一声「配一下佳明」就行。</p>
+                <div class="fit-empty-icon">⌚</div>
+                <div class="fit-empty-title">还没有今天的身体数据</div>
+                <div class="fit-empty-hint">佳明数据由 WorkBuddy 每天早上自动拉取并同步过来。<br>没配的话跟我说一声「配一下佳明」就行。</div>
             </div>`;
         }
         const r = computeReadiness(m);
         const pct = r.score != null ? (r.score / 10) * 100 : 0;
         const tone = r.score == null ? "" : (r.score >= 7.5 ? "good" : r.score >= 5.5 ? "ok" : "bad");
+        const label = r.score == null ? "—" : (r.score >= 7.5 ? "状态良好" : r.score >= 6.5 ? "可按计划执行" : r.score >= 4 ? "建议降量" : "建议休息");
+
+        // 关键指标（含与基线的相对箭头）
+        const trend = (val, base) => {
+            if (val == null || base == null) return "";
+            const d = val - base;
+            if (Math.abs(d) < 1) return "→";
+            return d > 0 ? "↑" : "↓";
+        };
         const cells = [
-            ["睡眠", m.sleepScore != null ? m.sleepScore : (m.sleepHours != null ? m.sleepHours + "h" : "—")],
-            ["HRV", m.hrv != null ? m.hrv + (m.hrvBaseline ? " <small>/ 基线 " + m.hrvBaseline + "</small>" : "") : "—"],
-            ["静息心率", m.rhr != null ? m.rhr + (m.rhrBaseline ? " <small>/ 基线 " + m.rhrBaseline + "</small>" : "") : "—"],
-            ["身体电量", m.bodyBattery != null ? m.bodyBattery : "—"],
-            ["压力", m.stress != null ? m.stress : "—"]
+            { k: "HRV", v: m.hrv, base: m.hrvBaseline, sym: trend(m.hrv, m.hrvBaseline), lower: m.hrvStatus === "UNBALANCED" },
+            { k: "静息心率", v: m.rhr, base: m.rhrBaseline, sym: trend(m.rhr, m.rhrBaseline) },
+            { k: "睡眠", v: m.sleepScore ?? (m.sleepHours != null ? m.sleepHours + "h" : null), base: null, sym: "" },
+            { k: "电量", v: m.bodyBattery, base: null, sym: m.bodyBattery != null && m.bodyBattery < 40 ? "↓" : "" },
+            { k: "压力", v: m.stress, base: null, sym: m.stress != null && m.stress > 50 ? "↑" : "" }
         ];
+
         return `
         <div class="fit-readiness ${tone}">
-            <div class="fit-readiness-num">${r.score != null ? r.score : "—"}<small>/10</small></div>
+            <div class="fit-readiness-num-wrap">
+                <span class="fit-readiness-num">${r.score != null ? r.score : "—"}</span><span class="fit-readiness-max">/ 10</span>
+            </div>
             <div class="fit-readiness-meta">
-                <div class="fit-readiness-label">今日准备度${r.inputs ? ` <small>（${r.inputs} 项指标）</small>` : ""}</div>
+                <div class="fit-readiness-label">${label}${r.inputs ? ` <span>· ${r.inputs} 项数据</span>` : ""}</div>
                 <div class="fit-bar"><i style="width:${pct}%"></i></div>
                 ${r.notes.length ? `<div class="fit-notes">${r.notes.map(n => escapeHtml(n)).join(" · ")}</div>` : ""}
             </div>
         </div>
         <div class="fit-metrics">
-            ${cells.map(([k, v]) => `<div class="fit-metric"><div class="fit-metric-v">${v}</div><div class="fit-metric-k">${k}</div></div>`).join("")}
+            ${cells.map(c => `<div class="fit-metric${c.lower ? " is-bad" : ""}">
+                <div class="fit-metric-v">${c.v != null ? c.v : "—"}${c.sym ? `<i class="fit-metric-sym">${c.sym}</i>` : ""}</div>
+                <div class="fit-metric-k">${c.k}${c.base != null ? `<span>/ ${c.base}</span>` : ""}</div>
+            </div>`).join("")}
         </div>`;
     }
 
@@ -389,54 +422,98 @@ const Fitness = (() => {
         const s = suggestWorkout(data);
         const T = TYPES[s.type] || TYPES.easy;
         const advice = data.advice && data.advice.date === today ? data.advice : null;
+        const w = (advice && advice.workout) || {};
+        const tone = w.tone || T.tone;
+        const type = w.type || s.type;
+        const name = (advice && advice.headline) || s.headline;
+        const km = w.km || s.km;
+        const pace = w.pace || s.pace;
+        const isFallback = !advice;
 
-        // 优先展示 WorkBuddy 生成的建议
-        if (advice) {
-            return `
-            <div class="fit-session tone-${(advice.workout && advice.workout.tone) || T.tone}">
-                <div class="fit-session-head">
-                    <span class="fit-session-icon">${T.icon}</span>
-                    <span class="fit-session-name">${escapeHtml(advice.headline || (advice.workout && advice.workout.name) || T.name)}</span>
-                    ${advice.workout && advice.workout.km ? `<span class="fit-session-km">${advice.workout.km} km</span>` : ""}
-                </div>
-                <div class="fit-session-detail">${(advice.detail || "").replace(/\n/g, "<br>")}</div>
-                ${advice.workout && advice.workout.pace ? `<div class="fit-session-pace">目标配速 ${escapeHtml(String(advice.workout.pace))}</div>` : ""}
-                <div class="fit-session-src">由 WorkBuddy 结合佳明数据生成 · ${escapeHtml(fmtTime(advice.updatedAt || advice.generatedAt))}</div>
-            </div>`;
-        }
+        const flags = (w && Array.isArray(w.flags)) ? w.flags : (s.overload && s.load ? [`负荷比 ${s.load.ratio.toFixed(2)} 超出安全区 0.8-1.3`] : []);
+        const detailText = (advice && advice.detail) || s.detail || "";
 
-        // 兜底：本地规则算一条
         return `
-        <div class="fit-session tone-${T.tone}">
+        <div class="fit-session tone-${tone}">
             <div class="fit-session-head">
                 <span class="fit-session-icon">${T.icon}</span>
-                <span class="fit-session-name">${escapeHtml(s.headline)}</span>
-                ${s.km ? `<span class="fit-session-km">${s.km} km</span>` : ""}
+                <span class="fit-session-type">${escapeHtml(name || T.name)}</span>
             </div>
-            <div class="fit-session-detail">${escapeHtml(s.detail)}</div>
-            ${s.pace ? `<div class="fit-session-pace">目标配速 ${fmtPace(s.pace)}/km</div>` : ""}
-            ${s.overload ? `<div class="fit-warn">最近 7 天跑量偏高（急性/慢性负荷比 ${s.load.ratio.toFixed(2)}，安全区 0.8-1.3），已自动降为恢复跑，别硬顶。</div>` : ""}
-            <div class="fit-session-src">本地规则生成（还没拿到今天的佳明建议，先给你一条能跑的）</div>
+            <div class="fit-session-hero">
+                ${km ? `<div class="fit-session-distance">${km}<small>km</small></div>` : `<div class="fit-session-distance">—</div>`}
+                ${pace ? `<div class="fit-session-pace">${pace ? (typeof pace === "number" ? fmtPace(pace) : escapeHtml(String(pace))) : ""}<small>/km</small></div>` : ""}
+            </div>
+            <div class="fit-session-detail">${escapeHtml(detailText).replace(/\n/g, "<br>")}</div>
+            ${flags.length ? `<div class="fit-warn">⚠ ${flags.map(escapeHtml).join(" · ")}</div>` : ""}
+            ${isFallback ? `<div class="fit-session-src">本地规则估算（今天的佳明建议还没出来）</div>` : ""}
         </div>`;
     }
 
     function renderWeekHtml(data, today) {
         const days = Array.isArray(data.trainingDays) ? data.trainingDays : [];
         const wd = weekdayOf(today);
-        let html = '<div class="fit-week-head">本周训练日</div><div class="fit-week">';
-        // 周一到周日展示
         const order = [1, 2, 3, 4, 5, 6, 0];
-        html += order.map(d => {
+        const cells = order.map(d => {
             const on = days.includes(d);
             const isToday = d === wd;
-            return `<div class="fit-day ${on ? "on" : ""} ${isToday ? "today" : ""}">
-                <div class="fit-day-w">${WEEK_NAMES[d]}</div>
-                <div class="fit-day-dot">${on ? "&#127939;" : "&#183;"}</div>
+            return `<div class="fit-day ${on ? "on" : ""} ${isToday ? "today" : ""}" title="${on ? "训练日" : "休息日"}">
+                <div class="fit-day-name">${WEEK_NAMES[d]}</div>
+                <div class="fit-day-dot${on ? " on" : ""}"></div>
             </div>`;
         }).join("");
-        html += "</div>";
-        if (!days.length) html += '<div class="fit-hint">还没选训练日，点下面「目标与训练日」设置。</div>';
-        return html;
+        const hint = !days.length
+            ? `<div class="fit-week-hint">还没选训练日 · <a href="#" id="fitWeekGoto">去设置</a></div>`
+            : "";
+        return `<div class="fit-week-head">本周训练日</div><div class="fit-week">${cells}</div>${hint}`;
+    }
+
+    function renderStatsHtml(data) {
+        const m = data.metrics || null;
+        const today = todayStr();
+        const km7 = m && m.last7Km != null ? m.last7Km : (countKm(data.logs, 7) || 0);
+        const km28 = m && m.last28Km != null ? m.last28Km : (countKm(data.logs, 28) || 0);
+        const runCount7 = m && m.runCount7 != null ? m.runCount7 : (countRuns(data.logs, 7) || 0);
+        const lr = loadRatio(data.logs || []);
+        const acwr = lr && lr.ratio ? lr.ratio.toFixed(2) : "—";
+        const acwrTone = !lr ? "" : (lr.ratio > 1.3 ? "bad" : lr.ratio < 0.8 ? "ok" : "good");
+
+        return `<div class="fit-stats">
+            <div class="fit-stat">
+                <div class="fit-stat-num">${km7}<small>km</small></div>
+                <div class="fit-stat-label">近 7 天</div>
+            </div>
+            <div class="fit-stat">
+                <div class="fit-stat-num">${runCount7}<small>次</small></div>
+                <div class="fit-stat-label">本周跑步</div>
+            </div>
+            <div class="fit-stat">
+                <div class="fit-stat-num">${km28}<small>km</small></div>
+                <div class="fit-stat-label">近 28 天</div>
+            </div>
+            <div class="fit-stat ${acwrTone}">
+                <div class="fit-stat-num">${acwr}</div>
+                <div class="fit-stat-label">负荷比<br><span class="fit-stat-sub">0.8-1.3</span></div>
+            </div>
+        </div>`;
+    }
+
+    function countKm(logs, days) {
+        if (!logs) return 0;
+        const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0); cutoff.setDate(cutoff.getDate() - days);
+        let s = 0;
+        logs.forEach(l => {
+            const d = parseDate(l.date);
+            if (d && d >= cutoff) s += Number(l.km) || 0;
+        });
+        return Math.round(s * 100) / 100;
+    }
+    function countRuns(logs, days) {
+        if (!logs) return 0;
+        const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0); cutoff.setDate(cutoff.getDate() - days);
+        return logs.filter(l => {
+            const d = parseDate(l.date);
+            return d && d >= cutoff;
+        }).length;
     }
 
     function fmtTime(ts) {

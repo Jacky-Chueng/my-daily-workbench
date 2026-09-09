@@ -1789,3 +1789,235 @@ button { font-family: inherit; cursor: pointer; }
     .fit-metrics { grid-template-columns: repeat(3, 1fr); }
     .fit-week { gap: 4px; }
 }
+/* =====================================================================
+   训练建议模块（fitness.js）
+   ===================================================================== */
+
+/* 准备度（主视觉）*/
+.fit-readiness {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--bg-soft) 0%, var(--bg-card) 100%);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-soft);
+    position: relative;
+    overflow: hidden;
+}
+.fit-readiness::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--primary);
+}
+.fit-readiness.good::before { background: var(--success); }
+.fit-readiness.ok::before { background: var(--warning); }
+.fit-readiness.bad::before { background: var(--danger); }
+.fit-readiness-num-wrap {
+    display: flex; align-items: baseline; white-space: nowrap; line-height: 1;
+}
+.fit-readiness-num {
+    font-size: 38px; font-weight: 500; color: var(--text); letter-spacing: -1px;
+}
+.fit-readiness-max { font-size: 13px; color: var(--text-faint); margin-left: 2px; }
+.fit-readiness-meta { flex: 1; min-width: 0; }
+.fit-readiness-label {
+    font-size: 13px; color: var(--text); margin-bottom: 8px; font-weight: 500;
+}
+.fit-readiness-label span { color: var(--text-faint); font-weight: 400; font-size: 12px; }
+.fit-bar { height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
+.fit-bar i {
+    display: block; height: 100%; background: var(--primary); border-radius: 3px;
+    transition: width .4s var(--ease);
+}
+.fit-readiness.good .fit-bar i { background: var(--success); }
+.fit-readiness.ok .fit-bar i { background: var(--warning); }
+.fit-readiness.bad .fit-bar i { background: var(--danger); }
+.fit-notes { margin-top: 8px; font-size: 12px; color: var(--text-soft); line-height: 1.5; }
+
+/* 关键指标 */
+.fit-metrics {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 18px;
+}
+.fit-metric {
+    background: var(--bg-soft); border-radius: var(--radius-sm);
+    padding: 10px 8px; text-align: center;
+    border: 1px solid transparent;
+    transition: all .2s var(--ease);
+}
+.fit-metric.is-bad { background: var(--danger-soft); }
+.fit-metric-v {
+    font-size: 15px; color: var(--text); font-weight: 500; line-height: 1;
+    display: flex; align-items: baseline; justify-content: center; gap: 2px;
+}
+.fit-metric-sym { font-style: normal; font-size: 10px; color: var(--text-faint); }
+.fit-metric.is-bad .fit-metric-sym { color: var(--danger); }
+.fit-metric-k { font-size: 10px; color: var(--text-faint); margin-top: 5px; }
+.fit-metric-k span { color: var(--text-faint); opacity: 0.6; }
+
+/* 今日课表 */
+.fit-session {
+    padding: 20px 22px;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    border: 1px solid var(--border-soft);
+    border-left: 4px solid var(--primary);
+    box-shadow: var(--shadow);
+    position: relative;
+}
+.fit-session.tone-interval {
+    border-left-color: var(--danger);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--danger-soft) 130%);
+}
+.fit-session.tone-tempo {
+    border-left-color: var(--warning);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--primary-soft) 130%);
+}
+.fit-session.tone-long {
+    border-left-color: var(--lavender);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--lavender-soft) 130%);
+}
+.fit-session.tone-easy { border-left-color: var(--success); }
+.fit-session.tone-rest { border-left-color: var(--border); }
+.fit-session.tone-recovery { border-left-color: var(--success); }
+.fit-session.tone-cross { border-left-color: var(--success); }
+
+.fit-session-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.fit-session-icon {
+    width: 34px; height: 34px;
+    background: var(--bg-soft);
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 16px;
+}
+.fit-session-type { font-size: 14px; color: var(--text-soft); font-weight: 500; }
+.fit-session-hero {
+    display: flex; align-items: baseline; gap: 18px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.fit-session-distance {
+    font-size: 36px; font-weight: 500; color: var(--text);
+    line-height: 1; letter-spacing: -1px;
+}
+.fit-session-distance small { font-size: 14px; color: var(--text-faint); font-weight: 400; margin-left: 4px; }
+.fit-session-pace { font-size: 18px; color: var(--primary); font-weight: 500; }
+.fit-session-pace small { font-size: 12px; color: var(--text-faint); font-weight: 400; margin-left: 2px; }
+.fit-session-detail { font-size: 13.5px; line-height: 1.75; color: var(--text); }
+.fit-warn {
+    margin-top: 12px; padding: 8px 12px;
+    background: rgba(176, 138, 133, 0.15);
+    color: var(--danger);
+    border-radius: var(--radius-xs);
+    font-size: 12px; line-height: 1.6;
+}
+.fit-session-src { margin-top: 12px; font-size: 11px; color: var(--text-faint); font-style: italic; }
+
+/* 操作区 */
+.fit-actions { display: flex; gap: 8px; margin: 16px 0; }
+
+/* 本周训练日 */
+.fit-week-head { font-size: 12px; color: var(--text-soft); margin-bottom: 10px; font-weight: 500; }
+.fit-week {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+    background: var(--bg-soft);
+    border-radius: var(--radius);
+    padding: 12px 8px;
+    border: 1px solid var(--border-soft);
+}
+.fit-day {
+    text-align: center;
+    padding: 8px 4px 10px;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    transition: all .2s var(--ease);
+}
+.fit-day.on { background: var(--primary-soft); }
+.fit-day.today { box-shadow: 0 0 0 2px var(--lavender); }
+.fit-day-name { font-size: 13px; color: var(--text-soft); margin-bottom: 6px; font-weight: 500; }
+.fit-day.on .fit-day-name { color: var(--text); }
+.fit-day.today .fit-day-name { color: var(--lavender-dark); font-weight: 600; }
+.fit-day-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: transparent;
+    margin: 0 auto;
+    border: 1.5px solid var(--border);
+}
+.fit-day-dot.on {
+    background: var(--primary);
+    border-color: var(--primary);
+    width: 8px; height: 8px;
+}
+.fit-week-hint { margin-top: 8px; font-size: 12px; color: var(--text-faint); text-align: center; }
+.fit-week-hint a { color: var(--primary); text-decoration: none; font-weight: 500; }
+.fit-week-hint a:hover { text-decoration: underline; }
+
+/* 近况统计 */
+.fit-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px;
+}
+.fit-stat {
+    background: var(--bg-soft);
+    border-radius: var(--radius-sm);
+    padding: 14px 8px;
+    text-align: center;
+    border: 1px solid transparent;
+    transition: all .2s var(--ease);
+}
+.fit-stat.good { background: var(--success-soft); }
+.fit-stat.ok { background: var(--primary-soft); }
+.fit-stat.bad { background: var(--danger-soft); }
+.fit-stat-num { font-size: 20px; font-weight: 500; color: var(--text); line-height: 1; }
+.fit-stat-num small { font-size: 11px; color: var(--text-faint); font-weight: 400; margin-left: 2px; }
+.fit-stat-label { font-size: 11px; color: var(--text-soft); margin-top: 6px; line-height: 1.3; }
+.fit-stat-sub { font-size: 10px; color: var(--text-faint); }
+
+/* 空状态 */
+.fit-empty {
+    padding: 40px 20px;
+    background: var(--bg-soft);
+    border-radius: var(--radius);
+    border: 1px dashed var(--border);
+    text-align: center;
+}
+.fit-empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.5; }
+.fit-empty-title { font-size: 14px; color: var(--text); font-weight: 500; margin-bottom: 6px; }
+.fit-empty-hint { font-size: 12px; color: var(--text-soft); line-height: 1.7; }
+.fit-hint { margin: 8px 0 0; font-size: 12px; color: var(--text-faint); line-height: 1.6; }
+
+/* 设置面板 */
+.fit-settings {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--bg-soft);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-soft);
+}
+.fit-form-row { margin-bottom: 14px; }
+.fit-form-row label { display: block; font-size: 12px; color: var(--text-soft); margin-bottom: 6px; font-weight: 500; }
+.fit-daypick { display: flex; gap: 6px; flex-wrap: wrap; }
+.fit-daybtn {
+    padding: 6px 12px; font-size: 12px; cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-soft);
+    border-radius: 999px;
+    transition: all .15s var(--ease);
+}
+.fit-daybtn:hover { border-color: var(--primary); color: var(--text); }
+.fit-daybtn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.fit-form-actions { display: flex; gap: 8px; margin-top: 14px; }
+
+/* 响应式 */
+@media (max-width: 640px) {
+    .fit-metrics { grid-template-columns: repeat(3, 1fr); }
+    .fit-stats { grid-template-columns: repeat(2, 1fr); }
+    .fit-readiness { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .fit-session-distance { font-size: 30px; }
+}
