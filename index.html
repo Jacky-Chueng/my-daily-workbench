@@ -7,8 +7,8 @@
     <meta name="description" content="每日英语学习、黄历、每日要闻、待办事项与心情记录一站式工作台">
     <!-- 版本号：每次 push 前把 ?v= 后面改一下（如 20260909a → 20260910b），
          否则 GitHub Pages 有 10 分钟缓存，刷新可能看不到最新改动 -->
-    <link rel="stylesheet" href="css/styles.css?v=20260909c">
-    <script src="js/config.js?v=20260909c"></script>
+    <link rel="stylesheet" href="css/styles.css?v=20260909d">
+    <script src="js/config.js?v=20260909d"></script>
 </head>
 <body>
     <!-- 顶部导航栏 -->
@@ -306,8 +306,10 @@
 
                     <div class="fit-actions">
                         <button id="fitAdHocBtn" class="btn btn-primary btn-sm" type="button" title="今天临时有空，马上给我一条能跑的">+ 临时想练</button>
+                        <button id="fitSyncBtn" class="btn btn-ghost btn-sm" type="button" title="立刻从佳明拉最新数据（通常 1 分钟内到位）">🔄 同步佳明</button>
                         <button id="fitSettingsBtn" class="btn btn-ghost btn-sm" type="button">⚙ 设置</button>
                     </div>
+                    <div id="fitSyncHint" class="fit-sync-hint hidden"></div>
 
                     <div id="fitWeek"></div>
                     <div id="fitStats"></div>
@@ -323,21 +325,21 @@
     <div id="toast" class="toast hidden"></div>
 
     <!-- 模块脚本（顺序加载） -->
-    <script src="js/api.js?v=20260909c"></script>
-    <script src="js/vocabulary.js?v=20260909c"></script>
-    <script src="js/daily-english.js?v=20260909c"></script>
-    <script src="js/almanac.js?v=20260909c"></script>
-    <script src="js/weather.js?v=20260909c"></script>
-    <script src="js/news.js?v=20260909c"></script>
-    <script src="js/todo.js?v=20260909c"></script>
-    <script src="js/mood.js?v=20260909c"></script>
-    <script src="js/home.js?v=20260909c"></script>
-    <script src="js/home-layout.js?v=20260909c"></script>
-    <script src="js/fitness.js?v=20260909c"></script>
-    <script src="js/data-io.js?v=20260909c"></script>
+    <script src="js/api.js?v=20260909d"></script>
+    <script src="js/vocabulary.js?v=20260909d"></script>
+    <script src="js/daily-english.js?v=20260909d"></script>
+    <script src="js/almanac.js?v=20260909d"></script>
+    <script src="js/weather.js?v=20260909d"></script>
+    <script src="js/news.js?v=20260909d"></script>
+    <script src="js/todo.js?v=20260909d"></script>
+    <script src="js/mood.js?v=20260909d"></script>
+    <script src="js/home.js?v=20260909d"></script>
+    <script src="js/home-layout.js?v=20260909d"></script>
+    <script src="js/fitness.js?v=20260909d"></script>
+    <script src="js/data-io.js?v=20260909d"></script>
     <!-- Supabase 云同步（需先在 config.js 配置并建表，见 SUPABASE_SETUP.md） -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/cloud-sync.js?v=20260909c"></script>
-    <script src="js/app.js?v=20260909c"></script>
+    <script src="js/cloud-sync.js?v=20260909d"></script>
+    <script src="js/app.js?v=20260909d"></script>
 </body>
 </html>

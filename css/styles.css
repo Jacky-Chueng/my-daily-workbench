@@ -1918,7 +1918,18 @@ button { font-family: inherit; cursor: pointer; }
 .fit-session-src { margin-top: 12px; font-size: 11px; color: var(--text-faint); font-style: italic; }
 
 /* 操作区 */
-.fit-actions { display: flex; gap: 8px; margin: 16px 0; }
+.fit-actions { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+.fit-sync-hint {
+    margin: -4px 0 14px;
+    padding: 8px 12px;
+    background: var(--primary-soft);
+    color: var(--text);
+    border-radius: var(--radius-xs);
+    font-size: 12px;
+    line-height: 1.5;
+    border-left: 3px solid var(--primary);
+}
+.fit-sync-hint:empty { display: none; }
 
 /* 本周训练日 */
 .fit-week-head { font-size: 12px; color: var(--text-soft); margin-bottom: 10px; font-weight: 500; }

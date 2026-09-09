@@ -46,7 +46,9 @@ const Fitness = (() => {
         week: () => document.getElementById("fitWeek"),
         stats: () => document.getElementById("fitStats"),
         countdown: () => document.getElementById("fitnessCountdown"),
-        settings: () => document.getElementById("fitSettings")
+        settings: () => document.getElementById("fitSettings"),
+        syncBtn: () => document.getElementById("fitSyncBtn"),
+        syncHint: () => document.getElementById("fitSyncHint")
     };
 
     /* ================= 数据读写 ================= */
@@ -354,6 +356,22 @@ const Fitness = (() => {
         const st = els.stats();
         if (st) st.innerHTML = renderStatsHtml(data);
 
+        // 同步状态提示
+        const h = els.syncHint();
+        if (h) {
+            const sr = data.syncRequest;
+            if (sr && sr.status === "pending") {
+                const ago = Math.max(0, Math.round((Date.now() - (sr.requestedAt || 0)) / 1000));
+                h.textContent = `已请求同步佳明 · ${ago < 5 ? "马上" : "通常 30 秒内"}到位`;
+                h.classList.remove("hidden");
+            } else if (sr && sr.status === "done") {
+                h.textContent = "✓ 已同步最新数据";
+                h.classList.remove("hidden");
+            } else {
+                h.classList.add("hidden");
+            }
+        }
+
         // "去设置"链接
         const goto = document.getElementById("fitWeekGoto");
         if (goto && !goto._bound) {
@@ -591,12 +609,74 @@ const Fitness = (() => {
         Api.showToast("已记录：今天要练。建议已临时生成，我下次同步时会按你实际状态微调后续安排", "success");
     }
 
+    /* ================= 同步佳明 =================
+       页面不能直连佳明（佳明 token 在本机），所以"点一下同步"的实现是：
+       把同步请求写进 Supabase 标记（syncRequest pending），
+       本机每 30 秒巡一次的守护进程会检测到并在 30 秒内拉取最新数据写回。 */
+    async function markSyncRequest() {
+        const cfg = window.APP_CONFIG && window.APP_CONFIG.supabase;
+        if (!cfg || !cfg.enabled || !cfg.url || !window.supabase) {
+            return { ok: false, reason: "云同步未配置" };
+        }
+        try {
+            const c = window.supabase.createClient(cfg.url, cfg.anonKey);
+            const { data: rows } = await c.from("sync_data")
+                .select("payload").eq("id", cfg.syncId).maybeSingle();
+            const payload = (rows && rows.payload) || {};
+            const fit = payload.fitness || {};
+            fit.syncRequest = { requestedAt: Date.now(), status: "pending" };
+            payload.fitness = fit;
+            const { error } = await c.from("sync_data").upsert({
+                id: cfg.syncId,
+                payload,
+                updated_at: new Date().toISOString()
+            });
+            if (error) throw error;
+            return { ok: true };
+        } catch (e) {
+            console.error("markSyncRequest failed:", e);
+            return { ok: false, reason: e.message || String(e) };
+        }
+    }
+
+    async function requestSync() {
+        const btn = els.syncBtn();
+        if (!btn) return;
+        const orig = btn.textContent;
+        btn.disabled = true; btn.textContent = "请求中…";
+        const showHint = (msg) => {
+            const h = els.syncHint();
+            if (!h) return;
+            h.textContent = msg;
+            h.classList.remove("hidden");
+        };
+        // 本地存在就立即给个反馈；标记 pending 也会立刻反映到本页（云同步 Realtime）
+        showHint("已请求同步 · 通常 30 秒内到位");
+        const r = await markSyncRequest();
+        btn.disabled = false; btn.textContent = orig;
+        if (!r.ok) {
+            showHint("请求失败：" + (r.reason || "网络问题") + " · 试试告诉 WorkBuddy 手动拉一下");
+            Api.showToast("同步请求失败，建议直接说「同步一下佳明」", "error");
+        } else {
+            // 立刻在本地数据里也置一个 pending 标记，刷新会显示
+            const data = load();
+            data.syncRequest = { requestedAt: Date.now(), status: "pending" };
+            save(data);
+            render();
+        }
+    }
+
     /* ================= 事件绑定 ================= */
     function bindEvents() {
         const adhoc = document.getElementById("fitAdHocBtn");
         if (adhoc && !adhoc._bound) {
             adhoc._bound = true;
             adhoc.addEventListener("click", requestAdHoc);
+        }
+        const sync = els.syncBtn();
+        if (sync && !sync._bound) {
+            sync._bound = true;
+            sync.addEventListener("click", requestSync);
         }
         const setBtn = document.getElementById("fitSettingsBtn");
         if (setBtn && !setBtn._bound) {
