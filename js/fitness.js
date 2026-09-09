@@ -883,10 +883,19 @@ const Fitness = (() => {
         const cloud = await fetchCloudFitness();
         if (!cloud) return false;
         const local = load();
-        const merged = { ...local, ...cloud };
+        const merged = mergeCloudOverLocal(local, cloud);
         Api.store.set(KEY, merged);
         render();
         return true;
+    }
+
+    // 云端覆盖本地，但跳过 null/undefined（避免云端历史 null 把用户刚设的目标/训练日抹掉）
+    function mergeCloudOverLocal(local, cloud) {
+        const out = { ...(local || {}) };
+        Object.keys(cloud || {}).forEach(k => {
+            if (cloud[k] != null) out[k] = cloud[k];
+        });
+        return out;
     }
 
     /* ================= 同步佳明 =================
@@ -948,7 +957,7 @@ const Fitness = (() => {
             const cloud = await fetchCloudFitness();
             if (!cloud) continue;
             const local = load();
-            Api.store.set(KEY, { ...local, ...cloud });
+            Api.store.set(KEY, mergeCloudOverLocal(local, cloud));
             render();
             const sr = cloud.syncRequest;
             const metricsChanged = cloud.metrics && (!local.metrics || cloud.metrics.updatedAt !== local.metrics.updatedAt);
