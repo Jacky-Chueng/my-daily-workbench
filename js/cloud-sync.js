@@ -107,6 +107,10 @@ const CloudSync = (() => {
         const ts2 = x => (x && (x.updatedAt || x.generatedAt || x.date ? (x.updatedAt || x.generatedAt || 0) : 0)) || 0;
         if (r.metrics !== undefined) out.metrics = ts2(r.metrics) >= ts2(l.metrics) ? r.metrics : l.metrics;
         if (r.advice !== undefined) out.advice = ts2(r.advice) >= ts2(l.advice) ? r.advice : l.advice;
+        if (r.coaching !== undefined) out.coaching = ts2(r.coaching) >= ts2(l.coaching) ? r.coaching : l.coaching;
+
+        // 手动课型标记：按日期 union，两端标记都保留（同一天冲突时本地优先）
+        out.manualTypes = { ...(r.manualTypes || {}), ...(l.manualTypes || {}) };
 
         const logs = [...(l.logs || []), ...(r.logs || [])];
         const seen = new Map();
@@ -116,6 +120,20 @@ const CloudSync = (() => {
         if (l.adHoc && l.adHoc.status === "pending") {
             out.adHoc = (!r.adHoc || (r.adHoc.requestedAt || 0) < (l.adHoc.requestedAt || 0)) ? l.adHoc : r.adHoc;
         } else if (r.adHoc !== undefined) out.adHoc = r.adHoc;
+
+        // syncRequest / pushWorkout：pending 优先，否则取时间戳更晚者，避免请求被旧数据覆盖丢失
+        const keepRequest = (la, ra) => {
+            if (!la && !ra) return undefined;
+            if (!la) return ra;
+            if (!ra) return la;
+            const laP = la.status === "pending", raP = ra.status === "pending";
+            if (laP !== raP) return laP ? la : ra;
+            return (ra.requestedAt || 0) >= (la.requestedAt || 0) ? ra : la;
+        };
+        const sr = keepRequest(l.syncRequest, r.syncRequest);
+        if (sr !== undefined) out.syncRequest = sr;
+        const pw = keepRequest(l.pushWorkout, r.pushWorkout);
+        if (pw !== undefined) out.pushWorkout = pw;
 
         return out;
     }

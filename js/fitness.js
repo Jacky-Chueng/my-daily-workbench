@@ -38,11 +38,22 @@ const Fitness = (() => {
         cross: { name: "交叉训练", icon: "&#129504;", tone: "easy" }
     };
 
+    // 可手动标记的课型（跑完点一下，算法按真实课型算负荷，而非用距离猜）
+    const MANUAL_TYPES = [
+        { key: "easy", name: "轻松跑" },
+        { key: "long", name: "长距离" },
+        { key: "tempo", name: "节奏跑" },
+        { key: "interval", name: "间歇" },
+        { key: "recovery", name: "恢复跑" },
+        { key: "cross", name: "交叉训练" }
+    ];
+
     const WEEK_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
 
     const els = {
         today: () => document.getElementById("fitToday"),
         workout: () => document.getElementById("fitWorkout"),
+        manualType: () => document.getElementById("fitManualType"),
         week: () => document.getElementById("fitWeek"),
         stats: () => document.getElementById("fitStats"),
         plan: () => document.getElementById("fitPlan"),
@@ -355,6 +366,10 @@ const Fitness = (() => {
         const w = els.workout();
         if (w) w.innerHTML = renderWorkoutHtml(data, today);
 
+        // 手动标记今日课型
+        const mt = els.manualType();
+        if (mt) mt.innerHTML = renderManualTypeHtml(data, today);
+
         // 本周安排
         const wk = els.week();
         if (wk) wk.innerHTML = renderWeekHtml(data, today);
@@ -505,6 +520,33 @@ const Fitness = (() => {
             ${flags.length ? `<div class="fit-warn">⚠ ${flags.map(escapeHtml).join(" · ")}</div>` : ""}
             ${isFallback ? `<div class="fit-session-src">本地规则估算（今天的 coach 结果还没出来）</div>` : ""}
         </div>`;
+    }
+
+    function renderManualTypeHtml(data, today) {
+        const cur = (data.manualTypes && data.manualTypes[today]) || null;
+        const btns = MANUAL_TYPES.map(t =>
+            `<button class="fit-mtype-btn${cur === t.key ? " on" : ""}" data-type="${t.key}" type="button">${t.name}</button>`
+        ).join("");
+        const curName = cur ? (MANUAL_TYPES.find(t => t.key === cur) || {}).name : null;
+        return `<div class="fit-manual">
+            <div class="fit-manual-head">🏷 标记今日课型 <span>跑完点一下，算法按真实课型算负荷（不再用距离猜）</span></div>
+            <div class="fit-manual-btns">${btns}</div>
+            ${curName ? `<div class="fit-manual-cur">已标记：${curName}（再点一次可取消）</div>` : ""}
+        </div>`;
+    }
+
+    function markManualType(type) {
+        const data = load();
+        if (!data.manualTypes) data.manualTypes = {};
+        const today = todayStr();
+        if (data.manualTypes[today] === type) {
+            delete data.manualTypes[today];
+        } else {
+            data.manualTypes[today] = type;
+        }
+        save(data);
+        render();
+        Api.showToast(data.manualTypes[today] ? "已标记今日课型 ✓" : "已取消标记", "success");
     }
 
     function renderWeekHtml(data, today) {
@@ -933,6 +975,14 @@ const Fitness = (() => {
                 const box = els.settings();
                 renderSettings();
                 box.classList.toggle("hidden");
+            });
+        }
+        const mtBox = els.manualType();
+        if (mtBox && !mtBox._bound) {
+            mtBox._bound = true;
+            mtBox.addEventListener("click", e => {
+                const b = e.target.closest(".fit-mtype-btn");
+                if (b) markManualType(b.dataset.type);
             });
         }
     }
