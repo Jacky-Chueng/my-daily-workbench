@@ -38,15 +38,25 @@
        2. 导航：页面切换
        ================================================================= */
     const Nav = (() => {
+        const hashPage = () => (location.hash || "").replace(/^#\/?/, "");
+        const exists = page => !!document.getElementById("page-" + page);
+
         function init() {
             const items = document.querySelectorAll(".nav-item");
             items.forEach(item => {
                 item.addEventListener("click", () => switchTo(item.dataset.page));
             });
-            // 从 localStorage 恢复
+            // 优先用地址栏的 #页面（方便直接分享/跳转某个页面），其次从 localStorage 恢复
+            const fromHash = hashPage();
             const saved = localStorage.getItem(PAGE_KEY);
-            if (saved && document.getElementById("page-" + saved)) switchTo(saved, true);
+            if (fromHash && exists(fromHash)) switchTo(fromHash, true);
+            else if (saved && exists(saved)) switchTo(saved, true);
             else switchTo("home", true);
+
+            window.addEventListener("hashchange", () => {
+                const p = hashPage();
+                if (p && exists(p)) switchTo(p, true);
+            });
         }
 
         function switchTo(page, silent) {
@@ -58,7 +68,13 @@
             document.querySelectorAll(".page").forEach(p => {
                 p.classList.toggle("active", p.id === "page-" + page);
             });
-            if (!silent) localStorage.setItem(PAGE_KEY, page);
+            if (!silent) {
+                localStorage.setItem(PAGE_KEY, page);
+                if (location.hash !== "#" + page) {
+                    try { history.replaceState(null, "", "#" + page); }
+                    catch (e) { location.hash = page; }
+                }
+            }
             // 关闭移动端抽屉
             document.querySelector(".sidebar")?.classList.remove("open");
             document.getElementById("sidebarBackdrop")?.classList.remove("show");

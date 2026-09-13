@@ -1,0 +1,367 @@
+/* =====================================================================
+   训练模块（fitness.js）· 参照佳速度的信息层级重做
+   —— 只作用于训练页，类名统一 fx- 前缀；旧 .fit-* 规则的覆盖由本文件完成
+   ===================================================================== */
+
+/* ---------- 课型色彩（--fx 主色 / --fx-soft 底色） ---------- */
+.fx-tone-tempo    { --fx: #b98f3e; --fx-soft: rgba(196, 168, 120, .22); }
+.fx-tone-interval { --fx: #a56a63; --fx-soft: rgba(176, 138, 133, .22); }
+.fx-tone-long     { --fx: #8f7cb8; --fx-soft: rgba(184, 168, 212, .26); }
+.fx-tone-easy     { --fx: #6f8a69; --fx-soft: rgba(143, 166, 138, .22); }
+.fx-tone-rest     { --fx: #a8a294; --fx-soft: rgba(181, 175, 159, .20); }
+.fx-tone-cross    { --fx: #6f8a69; --fx-soft: rgba(143, 166, 138, .22); }
+[data-theme="dark"] .fx-tone-tempo    { --fx: #d8bd85; }
+[data-theme="dark"] .fx-tone-interval { --fx: #d3a49d; }
+[data-theme="dark"] .fx-tone-long     { --fx: #c3b2e4; }
+[data-theme="dark"] .fx-tone-easy     { --fx: #a9c2a3; }
+[data-theme="dark"] .fx-tone-rest     { --fx: #c2bcae; }
+
+/* ---------- 通用容器 ---------- */
+.fx-card {
+    background: var(--bg-soft);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+}
+.fx-card.plain { background: var(--bg-card); box-shadow: var(--shadow); }
+.fx-head {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 14px;
+}
+.fx-head h3 {
+    font-size: 13px; font-weight: 500; color: var(--text);
+    letter-spacing: .04em; margin: 0;
+}
+.fx-head .fx-head-sub { font-size: 11px; color: var(--text-faint); font-weight: 400; }
+.fx-head .fx-head-right { margin-left: auto; font-size: 11px; color: var(--text-faint); }
+
+/* =====================================================================
+   1. 今日课表（hero）
+   ===================================================================== */
+.fx-hero-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.fx-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 11px; border-radius: 999px;
+    background: var(--fx-soft, var(--primary-soft)); color: var(--fx, var(--primary));
+    font-size: 12px; font-weight: 500;
+}
+.fx-badge svg { width: 13px; height: 13px; }
+.fx-pill {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--bg-card);
+    font-size: 11px; color: var(--text-soft);
+}
+.fx-pill b { font-weight: 500; color: var(--text); }
+
+.fx-hero-main { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.fx-km {
+    font-size: 46px; font-weight: 500; line-height: .9; letter-spacing: -2px;
+    color: var(--text); display: flex; align-items: baseline;
+}
+.fx-km small {
+    font-size: 14px; font-weight: 400; letter-spacing: 0;
+    color: var(--text-faint); margin-left: 5px;
+}
+.fx-km.rest-num { font-size: 30px; letter-spacing: -.5px; }
+.fx-pace { font-size: 20px; font-weight: 500; color: var(--fx, var(--primary)); line-height: 1; }
+.fx-pace small { font-size: 12px; font-weight: 400; color: var(--text-faint); margin-left: 3px; }
+.fx-hero-side {
+    margin-left: auto; text-align: right;
+    font-size: 11.5px; color: var(--text-faint); line-height: 1.7;
+}
+.fx-hero-side b { color: var(--text-soft); font-weight: 500; }
+
+/* 分段结构条 */
+.fx-seg { margin-top: 16px; }
+.fx-seg-bar { display: flex; gap: 3px; height: 9px; }
+.fx-seg-i { border-radius: 3px; background: var(--bg-hover); min-width: 8px; }
+.fx-seg-i.main { background: var(--fx, var(--primary)); }
+.fx-seg-i.wu { background: var(--primary-soft); }
+.fx-legend {
+    display: flex; flex-wrap: wrap; gap: 6px 16px;
+    margin-top: 9px; font-size: 11px; color: var(--text-soft);
+}
+.fx-legend i {
+    display: inline-block; width: 7px; height: 7px; border-radius: 2px;
+    background: var(--bg-hover); margin-right: 5px;
+}
+.fx-legend i.main { background: var(--fx, var(--primary)); }
+.fx-legend i.wu { background: var(--primary-soft); }
+.fx-legend b { color: var(--text); font-weight: 500; }
+
+.fx-detail { margin-top: 14px; font-size: 13px; line-height: 1.8; color: var(--text-soft); }
+.fx-src { margin-top: 8px; font-size: 11px; color: var(--text-faint); font-style: italic; }
+
+/* 闸门 / 提示条 */
+.fx-gate {
+    display: flex; gap: 9px; align-items: flex-start;
+    margin-top: 14px; padding: 10px 12px;
+    background: var(--bg-card); border: 1px solid var(--border-soft);
+    border-left: 3px solid var(--lavender);
+    border-radius: var(--radius-xs);
+    font-size: 12px; line-height: 1.65; color: var(--text-soft);
+}
+.fx-gate svg { width: 14px; height: 14px; flex: none; margin-top: 2px; color: var(--lavender-dark); }
+.fx-gate b { color: var(--text); font-weight: 500; }
+.fx-gate.warn { border-left-color: var(--danger); background: var(--danger-soft); color: var(--text); }
+.fx-gate.warn svg { color: var(--danger); }
+
+.fx-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.fx-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--bg-card);
+    color: var(--text-soft); font-size: 12.5px; cursor: pointer;
+    transition: all .18s var(--ease);
+}
+.fx-btn svg { width: 14px; height: 14px; }
+.fx-btn:hover { border-color: var(--primary); color: var(--text); }
+.fx-btn.primary {
+    background: var(--primary); border-color: var(--primary); color: #fff;
+}
+[data-theme="dark"] .fx-btn.primary { color: #1f1d1a; }
+.fx-btn.primary:hover { background: var(--primary-hover); color: #fff; }
+.fx-btn.done { border-color: var(--success); color: var(--success); background: var(--success-soft); }
+
+/* =====================================================================
+   2. 训练状态（准备度环 + 指标）
+   ===================================================================== */
+.fx-status { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 20px; align-items: center; }
+.fx-ring { position: relative; width: 128px; height: 128px; }
+.fx-ring svg { width: 100%; height: 100%; display: block; }
+.fx-ring-mid {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.fx-ring-num { font-size: 34px; font-weight: 500; line-height: 1; letter-spacing: -1.5px; color: var(--text); }
+.fx-ring-max { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+.fx-ring-cap {
+    text-align: center; margin-top: 10px; font-size: 12px; color: var(--text-soft);
+}
+.fx-ring-cap b { display: block; font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+
+.fx-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.fx-metric {
+    background: var(--bg-card); border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm); padding: 10px 11px;
+}
+.fx-metric-k {
+    font-size: 10.5px; color: var(--text-faint);
+    display: flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.fx-metric-v {
+    font-size: 18px; font-weight: 500; color: var(--text);
+    line-height: 1.2; margin-top: 4px;
+    display: flex; align-items: baseline; gap: 3px;
+}
+.fx-metric-v small { font-size: 10px; font-weight: 400; color: var(--text-faint); }
+.fx-metric-d { font-size: 10px; color: var(--text-faint); margin-top: 3px; }
+.fx-metric-d.up { color: var(--warning); }
+.fx-metric-d.down { color: var(--danger); }
+.fx-metric-d.good { color: var(--success); }
+.fx-metric.is-bad { background: var(--danger-soft); border-color: transparent; }
+.fx-metric-track { height: 3px; border-radius: 2px; background: var(--bg-hover); margin-top: 6px; overflow: hidden; }
+.fx-metric-track i { display: block; height: 100%; border-radius: 2px; background: var(--primary); }
+
+.fx-notes { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.fx-note {
+    font-size: 12px; line-height: 1.65; color: var(--text-soft);
+    padding-left: 12px; position: relative;
+}
+.fx-note::before {
+    content: ""; position: absolute; left: 0; top: 8px;
+    width: 4px; height: 4px; border-radius: 50%; background: var(--text-faint);
+}
+
+/* =====================================================================
+   3. 负荷平衡（ACWR 区间条）
+   ===================================================================== */
+.fx-gauge-bar { position: relative; height: 10px; margin: 26px 0 8px; }
+.fx-gauge-track {
+    position: absolute; inset: 0; border-radius: 5px;
+    background: var(--bg-hover); overflow: hidden;
+}
+.fx-gauge-safe {
+    position: absolute; top: 0; bottom: 0;
+    background: var(--success-soft);
+    border-left: 1px solid var(--success); border-right: 1px solid var(--success);
+}
+.fx-gauge-mark {
+    position: absolute; top: -22px; transform: translateX(-50%);
+    font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap;
+    text-align: center;
+}
+.fx-gauge-mark::after {
+    content: ""; display: block; width: 2px; height: 22px;
+    background: var(--text); margin: 3px auto 0; border-radius: 1px;
+    transform: translateY(2px);
+}
+.fx-gauge-mark.bad::after { background: var(--danger); }
+.fx-gauge-mark.bad { color: var(--danger); }
+.fx-gauge-scale {
+    position: relative; height: 14px;
+    font-size: 10px; color: var(--text-faint);
+}
+.fx-gauge-legend { font-size: 11px; color: var(--text-soft); }
+.fx-load-row {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+}
+.fx-load-item {
+    flex: 1; min-width: 84px;
+    background: var(--bg-card); border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm); padding: 9px 11px;
+}
+.fx-load-item span { font-size: 10.5px; color: var(--text-faint); display: block; }
+.fx-load-item b { font-size: 15px; font-weight: 500; color: var(--text); }
+.fx-load-item b small { font-size: 10px; font-weight: 400; color: var(--text-faint); margin-left: 2px; }
+
+/* =====================================================================
+   4. 本周训练量（柱状图）
+   ===================================================================== */
+.fx-chart { position: relative; }
+.fx-bars { display: flex; align-items: stretch; gap: 6px; height: 140px; padding-top: 16px; }
+.fx-bar-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.fx-bar-slot {
+    position: relative; flex: 1;
+    display: flex; align-items: flex-end; justify-content: center;
+}
+.fx-bar-stack {
+    position: relative; width: 100%; max-width: 34px;
+    display: flex; align-items: flex-end;
+}
+.fx-bar {
+    width: 100%; border-radius: 5px 5px 2px 2px;
+    background: var(--fx-soft, var(--primary-soft));
+    min-height: 3px; transition: height .4s var(--ease);
+}
+.fx-bar.done { background: var(--fx, var(--primary)); }
+.fx-bar.idle { background: var(--bg-hover); }
+.fx-bar-val {
+    position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+    margin-bottom: 3px; font-size: 10px; color: var(--text-soft); white-space: nowrap;
+}
+.fx-bar-w {
+    font-size: 11px; color: var(--text-faint); text-align: center;
+    width: 22px; height: 22px; line-height: 22px; border-radius: 50%; margin: 0 auto;
+}
+.fx-bar-col.is-today .fx-bar-w { background: var(--text); color: var(--bg-card); font-weight: 500; }
+.fx-bar-col.is-today .fx-bar { box-shadow: 0 0 0 1.5px var(--text); }
+.fx-chart-foot {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 11.5px; color: var(--text-soft);
+}
+.fx-chart-foot b { font-weight: 500; color: var(--text); }
+.fx-legend-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--text-faint); margin-top: 10px; }
+.fx-legend-row span { display: inline-flex; align-items: center; gap: 5px; }
+.fx-legend-row em { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* =====================================================================
+   5. 未来两周计划（按周分组）
+   ===================================================================== */
+.fx-plan { background: var(--bg-soft); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; }
+.fx-week {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; background: var(--bg-hover);
+    font-size: 11.5px; color: var(--text-soft);
+}
+.fx-week b { font-size: 12px; font-weight: 500; color: var(--text); }
+.fx-week .fx-week-total { margin-left: auto; }
+.fx-week .fx-week-total b { color: var(--fx, var(--primary)); }
+.fx-day { border-bottom: 1px solid var(--border-soft); }
+.fx-day:last-child { border-bottom: none; }
+.fx-day.today { background: var(--lavender-soft); }
+.fx-day-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; cursor: pointer;
+    transition: background .15s var(--ease);
+}
+.fx-day-row:hover { background: var(--bg-card); }
+.fx-day-date {
+    width: 104px; flex: none; font-size: 11.5px; color: var(--text-soft);
+    display: flex; align-items: center; gap: 5px; white-space: nowrap;
+}
+.fx-day-date b { color: var(--text); font-weight: 500; }
+.fx-day-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex: none;
+    background: var(--fx, var(--primary)); opacity: .9;
+}
+.fx-day-dot.off { background: var(--border); }
+.fx-day-type { font-size: 12.5px; font-weight: 500; color: var(--fx, var(--text)); display: flex; align-items: center; gap: 6px; }
+.fx-day-type svg { width: 13px; height: 13px; }
+.fx-day-meta { margin-left: auto; font-size: 11.5px; color: var(--text-soft); white-space: nowrap; }
+.fx-day-meta b { font-weight: 500; color: var(--text); }
+.fx-day-caret { font-size: 10px; color: var(--text-faint); transition: transform .18s var(--ease); }
+.fx-day.open .fx-day-caret { transform: rotate(180deg); }
+.fx-day-detail {
+    padding: 2px 14px 14px 14px; font-size: 12.5px; line-height: 1.75; color: var(--text-soft);
+    background: var(--bg-card);
+}
+.fx-day-detail .fx-detail-actions { margin-top: 10px; }
+.fx-chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.fx-chip {
+    font-size: 10.5px; color: var(--text-soft);
+    background: var(--bg-soft); border-radius: 999px; padding: 3px 9px;
+}
+.fx-chip.gate { color: var(--lavender-dark); background: var(--lavender-soft); }
+
+/* =====================================================================
+   6. 标记课型 / 设置 / 杂项
+   ===================================================================== */
+.fx-manual { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.fx-manual-label { font-size: 11.5px; color: var(--text-faint); }
+.fx-chipbtn {
+    padding: 5px 11px; font-size: 11.5px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-card);
+    color: var(--text-soft); border-radius: 999px;
+    transition: all .15s var(--ease);
+}
+.fx-chipbtn:hover { border-color: var(--primary); color: var(--text); }
+.fx-chipbtn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+[data-theme="dark"] .fx-chipbtn.on { color: #1f1d1a; }
+
+.fit-sync-hint {
+    margin: 0 0 14px; padding: 8px 12px;
+    background: var(--primary-soft); color: var(--text);
+    border-radius: var(--radius-xs); font-size: 12px; line-height: 1.5;
+    border-left: 3px solid var(--primary);
+}
+
+/* 旧结构（设置面板等）在新视觉下的微调 */
+.card-fitness .fit-empty { border-style: dashed; padding: 32px 20px; }
+.card-fitness .fit-settings {
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+.card-fitness .fit-form-row label {
+    font-size: 11.5px; color: var(--text-faint); letter-spacing: .03em;
+}
+.card-fitness .fit-settings .btn-sm, .card-fitness .fit-actions .btn-sm { border-radius: 999px; }
+.card-fitness .fit-actions { margin: 16px 0 14px; }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 900px) {
+    .fx-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+    .fx-status { grid-template-columns: 1fr; justify-items: center; gap: 16px; }
+    .fx-ring { width: 112px; height: 112px; }
+    .fx-metrics { width: 100%; }
+    .fx-km { font-size: 38px; }
+    .fx-hero-side { margin-left: 0; text-align: left; }
+    .fx-day-date { width: 84px; }
+    .fx-day-meta { display: none; }
+    .fx-bars { gap: 4px; }
+}
+@media (max-width: 420px) {
+    .fx-bar-val { display: none; }
+}
+@media (max-width: 520px) {
+    .fx-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

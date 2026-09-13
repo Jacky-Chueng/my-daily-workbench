@@ -49,6 +49,8 @@ const Fitness = (() => {
     ];
 
     const WEEK_NAMES = ["日", "一", "二", "三", "四", "五", "六"];
+    const PHASE_NAMES = { base: "基础期", build: "进展期", peak: "巅峰期", taper: "减量期" };
+    const phaseName = p => PHASE_NAMES[p] || p || "";
 
     const els = {
         today: () => document.getElementById("fitToday"),
@@ -346,6 +348,110 @@ const Fitness = (() => {
         }
     }
 
+    /* ================= 视觉小件（内联 SVG，替代 emoji） ================= */
+    const ICONS = {
+        tempo: '<path d="M9 1.4 3.1 9.5h3.7L5.5 14.6 12 6.5H8.3z" fill="currentColor" stroke="none"/>',
+        interval: '<path d="M2 12.4h2.6V7.2H2zM6.7 12.4h2.6V3.2H6.7zM11.4 12.4H14V5.6h-2.6z" fill="currentColor" stroke="none"/>',
+        long: '<path d="M2.4 13.2 6.6 4.4l2.2 4.8 1.6-2.9 2.6 6.9"/>',
+        easy: '<path d="M12.4 3.1A6.2 6.2 0 0 0 3 8.3c0 2.3 1.5 4.2 3 4.2 1.2 0 1.7-1 2.5-2.2.7-1.1 1.4-2 2.6-2 1.3 0 2.2 1.2 2.2 1.2"/>',
+        rest: '<path d="M12.8 9.6A5.7 5.7 0 0 1 6.2 2a5.7 5.7 0 1 0 6.6 7.6z"/>',
+        cross: '<path d="M8 2.4v11.2M2.4 8h11.2"/>',
+        watch: '<circle cx="8" cy="8" r="5.4"/><path d="M8 4.9V8l2.2 1.4"/>',
+        shield: '<path d="M8 1.7 3.4 3.5v4c0 3 1.8 5.5 4.6 6.8 2.8-1.3 4.6-3.8 4.6-6.8v-4z"/>',
+        alert: '<path d="M8 2.2 14 13H2z"/><path d="M8 6.4v3M8 11.3h.01"/>',
+        info: '<circle cx="8" cy="8" r="6.2"/><path d="M8 7.3v4.1M8 4.8h.01"/>',
+        chevron: '<path d="M4.2 6.4 8 10.2l3.8-3.8"/>'
+    };
+    function icon(key, cls) {
+        return `<svg class="${cls || ""}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key] || ICONS.info}</svg>`;
+    }
+    const TYPE_ICON = { tempo: "tempo", interval: "interval", long: "long", easy: "easy", recovery: "easy", cross: "cross", rest: "rest" };
+    function iconOf(type) { return TYPE_ICON[type] || "easy"; }
+    function toneOf(type) { return (TYPES[type] || TYPES.easy).tone || "easy"; }
+    function clampPct(x, floor) {
+        if (x == null || !isFinite(x)) return 0;
+        return Math.max(floor == null ? 4 : floor, Math.min(100, x * 100));
+    }
+
+    // 与基线比：goodWhenHigh=true 表示越高越好（HRV）
+    function deltaInfo(val, base, goodWhenHigh) {
+        if (val == null || base == null) return null;
+        const d = val - base;
+        if (Math.abs(d) < 0.5) return { txt: "与基线持平", cls: "" };
+        const up = d > 0;
+        const good = goodWhenHigh ? up : !up;
+        const abs = Math.abs(d) >= 10 ? Math.round(Math.abs(d)) : Math.abs(d).toFixed(1);
+        return { txt: (up ? "高于" : "低于") + "基线 " + abs, cls: good ? "good" : "down" };
+    }
+
+    // 准备度环
+    function ringSvg(score, tone) {
+        const R = 53, C = 2 * Math.PI * R;
+        const pct = score == null ? 0 : Math.max(0, Math.min(1, score / 10));
+        const color = tone === "good" ? "var(--success)" : tone === "ok" ? "var(--warning)"
+            : tone === "bad" ? "var(--danger)" : "var(--primary)";
+        const label = score == null ? "准备度暂无数据" : `准备度 ${score} 分，满分 10 分`;
+        return `<svg viewBox="0 0 128 128" role="img" aria-label="${label}">
+            <circle cx="64" cy="64" r="${R}" fill="none" stroke="var(--bg-hover)" stroke-width="9"/>
+            <circle cx="64" cy="64" r="${R}" fill="none" stroke="${color}" stroke-width="9"
+                stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}"
+                stroke-dashoffset="${(C * (1 - pct)).toFixed(1)}" transform="rotate(-90 64 64)"/>
+        </svg>`;
+    }
+
+    // ACWR 区间条（0–2.0，绿色为安全区 0.8–1.3）
+    function acwrGauge(v) {
+        const MAX = 2;
+        const pos = x => Math.max(0, Math.min(1, x / MAX)) * 100;
+        const off = v > 1.3 || v < 0.8;
+        const at = (x, txt) => `<span style="position:absolute;left:${pos(x)}%;transform:translateX(-50%)">${txt}</span>`;
+        return `<div class="fx-gauge-bar">
+            <div class="fx-gauge-track">
+                <div class="fx-gauge-safe" style="left:${pos(0.8)}%;width:${pos(1.3) - pos(0.8)}%"></div>
+            </div>
+            <div class="fx-gauge-mark${off ? " bad" : ""}" style="left:${pos(v)}%">${v.toFixed(2)}</div>
+        </div>
+        <div class="fx-gauge-scale">
+            <span style="position:absolute;left:0">0</span>
+            ${at(0.8, "0.8 安全区")}
+            ${at(1.3, "1.3")}
+            <span style="position:absolute;right:0">2.0</span>
+        </div>`;
+    }
+
+    // 课表分段（用于今日课表的结构条）
+    function segmentsFor(type, km, paceSec, paces) {
+        if (!km) return [];
+        const p = paces || {};
+        const fmt = s => fmtPace(s);
+        if (type === "tempo" && km > 4) {
+            return [
+                { role: "wu", km: 2, label: `热身 2km`, sub: "由慢到快" },
+                { role: "main", km: km - 4, label: `主项 ${km - 4}km`, sub: paceSec ? "@ " + fmt(paceSec) : "" },
+                { role: "wu", km: 2, label: `放松 2km`, sub: "越跑越慢" }
+            ];
+        }
+        if (type === "interval" && km > 3.2) {
+            const reps = Math.max(3, Math.round((km - 4) / 1));
+            return [
+                { role: "wu", km: 2, label: `热身 2km`, sub: "由慢到快" },
+                { role: "main", km: km - 4, label: `${reps}×800m`, sub: (paceSec ? "@ " + fmt(paceSec) : "") + " · 间休 90s" },
+                { role: "wu", km: 2, label: `放松 2km`, sub: "越跑越慢" }
+            ];
+        }
+        return [{ role: "main", km, label: (TYPES[type] || TYPES.easy).name + " " + km + "km", sub: paceSec ? "@ " + fmt(paceSec) : "" }];
+    }
+
+    function segBarHtml(segs) {
+        if (!segs.length) return "";
+        const total = segs.reduce((s, x) => s + x.km, 0) || 1;
+        const bar = segs.map(s => `<div class="fx-seg-i ${s.role}" style="flex:${(s.km / total).toFixed(3)}"></div>`).join("");
+        const legend = segs.map(s =>
+            `<span><i class="${s.role}"></i><b>${escapeHtml(s.label)}</b>${s.sub ? " · " + escapeHtml(s.sub) : ""}</span>`
+        ).join("");
+        return `<div class="fx-seg"><div class="fx-seg-bar">${bar}</div><div class="fx-legend">${legend}</div></div>`;
+    }
+
     /* ================= 渲染 ================= */
     function render() {
         const data = load();
@@ -424,8 +530,8 @@ const Fitness = (() => {
         const m = data.metrics && data.metrics.date === today ? data.metrics : null;
         const coaching = getTodayCoaching(data);
         if (!m) {
-            return `<div class="fit-empty">
-                <div class="fit-empty-icon">⌚</div>
+            return `<div class="fx-card plain fit-empty">
+                <div class="fit-empty-icon">${icon("watch", "fx-empty-ico")}</div>
                 <div class="fit-empty-title">还没有今天的身体数据</div>
                 <div class="fit-empty-hint">佳明数据由 WorkBuddy 每天早上自动拉取并同步过来。<br>没配的话跟我说一声「配一下佳明」就行。</div>
             </div>`;
@@ -433,45 +539,77 @@ const Fitness = (() => {
         // 优先用 coach.py 的权威结果（coaching），否则本地近似
         const local = computeReadiness(m);
         const score = coaching ? coaching.readiness : local.score;
-        const pct = score != null ? (score / 10) * 100 : 0;
         const tone = score == null ? "" : (score >= 7.5 ? "good" : score >= 5.5 ? "ok" : "bad");
         const verdictMap = { excellent: "状态极佳", normal: "状态正常", fatigued: "略疲劳", rest: "需要休息" };
         const label = coaching ? (verdictMap[coaching.verdict] || "—")
             : (score == null ? "—" : (score >= 7.5 ? "状态良好" : score >= 6.5 ? "可按计划执行" : score >= 4 ? "建议降量" : "建议休息"));
         const notes = coaching ? (coaching.readinessNotes || []) : local.notes;
         const inputs = coaching ? coaching.readinessInputs : local.inputs;
+        const hb = (coaching && coaching.hrv) || null;
 
-        // 关键指标（含与基线的相对箭头）
-        const trend = (val, base) => {
-            if (val == null || base == null) return "";
-            const d = val - base;
-            if (Math.abs(d) < 1) return "→";
-            return d > 0 ? "↑" : "↓";
-        };
         const cells = [
-            { k: "HRV", v: m.hrv, base: m.hrvBaseline, sym: trend(m.hrv, m.hrvBaseline), lower: m.hrvStatus === "UNBALANCED" },
-            { k: "静息心率", v: m.rhr, base: m.rhrBaseline, sym: trend(m.rhr, m.rhrBaseline) },
-            { k: "睡眠", v: m.sleepScore ?? (m.sleepHours != null ? m.sleepHours + "h" : null), base: null, sym: "" },
-            { k: "电量", v: m.bodyBattery, base: null, sym: m.bodyBattery != null && m.bodyBattery < 40 ? "↓" : "" },
-            { k: "压力", v: m.stress, base: null, sym: m.stress != null && m.stress > 50 ? "↑" : "" }
+            {
+                k: "HRV", v: m.hrv, unit: "ms",
+                pct: clampPct(m.hrv / ((hb && hb.bandHigh) || m.hrvBandHigh || (m.hrvBaseline ? m.hrvBaseline * 1.2 : 150))),
+                d: deltaInfo(m.hrv, (hb && hb.mu) || m.hrvBaseline, true),
+                sub: hb ? `正常带 ${Math.round(hb.bandLow)}–${Math.round(hb.bandHigh)}` : null
+            },
+            {
+                k: "静息心率", v: m.rhr, unit: "bpm",
+                pct: clampPct(m.rhr && m.rhrBaseline ? m.rhr / (m.rhrBaseline * 1.4) : null),
+                d: deltaInfo(m.rhr, m.rhrBaseline, false)
+            },
+            {
+                k: "睡眠", v: m.sleepScore != null ? m.sleepScore : (m.sleepHours != null ? m.sleepHours : null),
+                unit: m.sleepScore != null ? "分" : (m.sleepHours != null ? "h" : ""),
+                pct: clampPct(m.sleepScore != null ? m.sleepScore / 100 : (m.sleepHours ? m.sleepHours / 9 : null)),
+                d: (m.sleepHours != null && m.sleepScore != null) ? { txt: m.sleepHours + " 小时", cls: "" } : null
+            },
+            {
+                k: "身体电量", v: m.bodyBattery, unit: "",
+                pct: clampPct(m.bodyBattery != null ? m.bodyBattery / 100 : null),
+                d: m.bodyBattery != null ? { txt: m.bodyBattery < 40 ? "偏低" : "正常", cls: m.bodyBattery < 40 ? "down" : "good" } : null
+            },
+            {
+                k: "压力", v: m.stress, unit: "",
+                pct: clampPct(m.stress != null ? m.stress / 100 : null),
+                d: m.stress != null ? { txt: m.stress > 50 ? "偏高" : "低", cls: m.stress > 50 ? "down" : "good" } : null,
+                bad: m.stress != null && m.stress > 50
+            }
         ];
 
-        return `
-        <div class="fit-readiness ${tone}">
-            <div class="fit-readiness-num-wrap">
-                <span class="fit-readiness-num">${score != null ? score : "—"}</span><span class="fit-readiness-max">/ 10</span>
+        return `<div class="fx-card plain">
+            <div class="fx-head">
+                <h3>训练状态</h3>
+                <span class="fx-head-sub">佳明今晨数据</span>
+                ${coaching && coaching.weeksOut != null
+                    ? `<span class="fx-head-right">${escapeHtml(phaseName(coaching.phase))} · 距比赛 ${Math.round(coaching.weeksOut)} 周</span>`
+                    : ""}
             </div>
-            <div class="fit-readiness-meta">
-                <div class="fit-readiness-label">${label}${inputs ? ` <span>· ${inputs} 项数据</span>` : ""}</div>
-                <div class="fit-bar"><i style="width:${pct}%"></i></div>
-                ${notes.length ? `<div class="fit-notes">${notes.map(n => escapeHtml(n)).join(" · ")}</div>` : ""}
+            <div class="fx-status">
+                <div>
+                    <div class="fx-ring">
+                        ${ringSvg(score, tone)}
+                        <div class="fx-ring-mid">
+                            <span class="fx-ring-num">${score != null ? score : "—"}</span>
+                            <span class="fx-ring-max">/ 10</span>
+                        </div>
+                    </div>
+                    <div class="fx-ring-cap"><b>${escapeHtml(label)}</b>${inputs ? inputs + " 项数据综合" : ""}</div>
+                </div>
+                <div>
+                    <div class="fx-metrics">
+                        ${cells.map(c => `<div class="fx-metric${c.bad ? " is-bad" : ""}">
+                            <div class="fx-metric-k">${c.k}</div>
+                            <div class="fx-metric-v">${c.v != null ? c.v : "—"}${c.unit ? `<small>${c.unit}</small>` : ""}</div>
+                            ${c.d ? `<div class="fx-metric-d ${c.d.cls}">${escapeHtml(c.d.txt)}</div>`
+                                  : (c.sub ? `<div class="fx-metric-d">${escapeHtml(c.sub)}</div>` : `<div class="fx-metric-d">—</div>`)}
+                            <div class="fx-metric-track"><i style="width:${c.pct}%"></i></div>
+                        </div>`).join("")}
+                    </div>
+                    ${notes.length ? `<div class="fx-notes">${notes.map(n => `<div class="fx-note">${escapeHtml(n)}</div>`).join("")}</div>` : ""}
+                </div>
             </div>
-        </div>
-        <div class="fit-metrics">
-            ${cells.map(c => `<div class="fit-metric${c.lower ? " is-bad" : ""}">
-                <div class="fit-metric-v">${c.v != null ? c.v : "—"}${c.sym ? `<i class="fit-metric-sym">${c.sym}</i>` : ""}</div>
-                <div class="fit-metric-k">${c.k}${c.base != null ? `<span>/ ${c.base}</span>` : ""}</div>
-            </div>`).join("")}
         </div>`;
     }
 
@@ -506,32 +644,55 @@ const Fitness = (() => {
             isFallback = true;
         }
 
-        return `
-        <div class="fit-session tone-${tone}">
-            <div class="fit-session-head">
-                <span class="fit-session-icon">${T.icon}</span>
-                <span class="fit-session-type">${escapeHtml(name || T.name)}</span>
+        const paceSec = typeof pace === "number" ? pace : null;
+        const paces = (data.coaching && data.coaching.paces) || pacesFromGoal(data.goal);
+        const isRest = type === "rest" || !km;
+        const segs = isRest ? [] : segmentsFor(type, km, paceSec, paces);
+        // 旗标分类：闸门（触发式降级）/ 负荷提醒 / 其他说明
+        const flagItems = (flags || []).map(f => {
+            if (/闸门/.test(f)) {
+                return { cls: "", ic: "shield", title: "闸门", text: String(f).replace(/^守闸门[:：]\s*/, "") };
+            }
+            if (/ACWR|负荷|安全区/.test(f)) {
+                return { cls: " warn", ic: "alert", title: "负荷提醒", text: String(f) };
+            }
+            return { cls: "", ic: "info", title: "说明", text: String(f).replace(/^[^：:]{0,14}[:：]\s*/, "") };
+        });
+        const goal = data.goal || {};
+        const dLeft = goal.raceDate ? daysUntil(goal.raceDate) : null;
+        const phaseTxt = (coaching && coaching.phase) ? phaseName(coaching.phase) : "";
+
+        return `<div class="fx-card plain fx-tone-${tone}">
+            <div class="fx-hero-top">
+                <span class="fx-badge">${icon(iconOf(type))} ${escapeHtml(name || T.name)}</span>
+                <span class="fx-pill">${dLeft != null ? `距比赛 <b>${dLeft}</b> 天` : "未设目标"}${phaseTxt ? ` · ${escapeHtml(phaseTxt)}` : ""}</span>
             </div>
-            <div class="fit-session-hero">
-                ${km ? `<div class="fit-session-distance">${km}<small>km</small></div>` : `<div class="fit-session-distance">—</div>`}
-                ${pace ? `<div class="fit-session-pace">${typeof pace === "number" ? fmtPace(pace) : escapeHtml(String(pace))}<small>/km</small></div>` : ""}
+            <div class="fx-hero-main">
+                ${isRest ? `<div class="fx-km rest-num">休息日</div>` : `<div class="fx-km">${km}<small>km</small></div>`}
+                ${!isRest && pace ? `<div class="fx-pace">${typeof pace === "number" ? fmtPace(pace) : escapeHtml(String(pace))}<small>/km</small></div>` : ""}
+                <div class="fx-hero-side">
+                    ${paceSec && paces && paces.easy ? `热身与放松锚在轻松跑配速 <b>${fmtPace(paces.easy)}</b>` : ""}
+                </div>
             </div>
-            <div class="fit-session-detail">${escapeHtml(detailText).replace(/\n/g, "<br>")}</div>
-            ${flags.length ? `<div class="fit-warn">⚠ ${flags.map(escapeHtml).join(" · ")}</div>` : ""}
-            ${isFallback ? `<div class="fit-session-src">本地规则估算（今天的 coach 结果还没出来）</div>` : ""}
+            ${segBarHtml(segs)}
+            <div class="fx-detail">${escapeHtml(detailText).replace(/\n/g, "<br>")}</div>
+            ${flagItems.map(f => `<div class="fx-gate${f.cls}">${icon(f.ic)}<div><b>${f.title}</b> · ${escapeHtml(f.text)}</div></div>`).join("")}
+            ${isFallback ? `<div class="fx-src">本地规则估算（今天的 coach 结果还没出来）</div>` : ""}
+            ${isRest ? "" : `<div class="fx-actions">
+                <button class="fx-btn primary fit-plan-push" data-date="${today}" type="button">${icon("watch")} 推到佳明手表</button>
+            </div>`}
         </div>`;
     }
 
     function renderManualTypeHtml(data, today) {
         const cur = (data.manualTypes && data.manualTypes[today]) || null;
         const btns = MANUAL_TYPES.map(t =>
-            `<button class="fit-mtype-btn${cur === t.key ? " on" : ""}" data-type="${t.key}" type="button">${t.name}</button>`
+            `<button class="fx-chipbtn${cur === t.key ? " on" : ""}" data-type="${t.key}" type="button">${t.name}</button>`
         ).join("");
-        const curName = cur ? (MANUAL_TYPES.find(t => t.key === cur) || {}).name : null;
-        return `<div class="fit-manual">
-            <div class="fit-manual-head">🏷 标记今日课型 <span>跑完点一下，算法按真实课型算负荷（不再用距离猜）</span></div>
-            <div class="fit-manual-btns">${btns}</div>
-            ${curName ? `<div class="fit-manual-cur">已标记：${curName}（再点一次可取消）</div>` : ""}
+        return `<div class="fx-manual">
+            <span class="fx-manual-label">跑完点一下实际课型 · 算法按真实课型算负荷</span>
+            ${btns}
+            ${cur ? `<span class="fx-manual-label">已标记（再点一次取消）</span>` : ""}
         </div>`;
     }
 
@@ -549,56 +710,116 @@ const Fitness = (() => {
         Api.showToast(data.manualTypes[today] ? "已标记今日课型 ✓" : "已取消标记", "success");
     }
 
+    // 本周每天：实际跑量（logs 当天可能有多次，需累加）优先，没有就用计划量
+    function weekVolume(data, today) {
+        const plan = (data.coaching && data.coaching.plan) || data.plan || [];
+        const logs = data.logs || [];
+        const t0 = parseDate(today) || new Date();
+        const monday = new Date(t0.getTime());
+        monday.setDate(t0.getDate() - ((t0.getDay() + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+        const bars = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday.getTime());
+            d.setDate(monday.getDate() + i);
+            const ds = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+            const pi = plan.find(p => p.date === ds) || null;
+            const dayLogs = logs.filter(l => l.date === ds);
+            const actual = Math.round(dayLogs.reduce((s, l) => s + (Number(l.km) || 0), 0) * 100) / 100;
+            bars.push({
+                date: ds, wd: d.getDay(),
+                actual, runs: dayLogs.length,
+                plan: pi ? Number(pi.km) || 0 : 0,
+                type: (pi && pi.type) || "rest",
+                done: actual > 0, isToday: ds === today
+            });
+        }
+        return bars;
+    }
+
     function renderWeekHtml(data, today) {
-        const days = Array.isArray(data.trainingDays) ? data.trainingDays : [];
-        const wd = weekdayOf(today);
-        const order = [1, 2, 3, 4, 5, 6, 0];
-        const cells = order.map(d => {
-            const on = days.includes(d);
-            const isToday = d === wd;
-            return `<div class="fit-day ${on ? "on" : ""} ${isToday ? "today" : ""}" title="${on ? "训练日" : "休息日"}">
-                <div class="fit-day-name">${WEEK_NAMES[d]}</div>
-                <div class="fit-day-dot${on ? " on" : ""}"></div>
+        const bars = weekVolume(data, today);
+        const max = Math.max(4, Math.max.apply(null, bars.map(b => Math.max(b.plan, b.actual))));
+        const cols = bars.map(b => {
+            const km = b.done ? b.actual : b.plan;
+            const h = km ? Math.max(6, Math.round((km / max) * 100)) : 2;
+            return `<div class="fx-bar-col ${b.isToday ? "is-today" : ""}" title="${b.date} · ${km ? km + " km" : "休息"}">
+                <div class="fx-bar-slot">
+                    <div class="fx-bar-stack" style="height:${h}%">
+                        ${km ? `<span class="fx-bar-val">${km}</span>` : ""}
+                        <div class="fx-bar fx-tone-${toneOf(b.type)}${b.done ? " done" : ""}${km ? "" : " idle"}"></div>
+                    </div>
+                </div>
+                <div class="fx-bar-w">${WEEK_NAMES[b.wd]}</div>
             </div>`;
         }).join("");
-        const hint = !days.length
-            ? `<div class="fit-week-hint">还没选训练日 · <a href="#" id="fitWeekGoto">去设置</a></div>`
-            : "";
-        return `<div class="fit-week-head">本周训练日</div><div class="fit-week">${cells}</div>${hint}`;
+        const doneKm = Math.round(bars.reduce((s, b) => s + b.actual, 0) * 10) / 10;
+        const planKm = Math.round(bars.reduce((s, b) => s + b.plan, 0) * 10) / 10;
+        const doneCount = bars.reduce((s, b) => s + b.runs, 0);
+        const quality = bars.filter(b => ["tempo", "interval", "long"].includes(b.type)).length;
+        const td = Array.isArray(data.trainingDays) ? data.trainingDays : [];
+        const showRate = planKm > doneKm && planKm > 0;
+        const md = ds => {
+            const d = parseDate(ds);
+            return d ? `${d.getMonth() + 1}/${d.getDate()}` : ds;
+        };
+        return `<div class="fx-card">
+            <div class="fx-head">
+                <h3>本周训练量</h3>
+                <span class="fx-head-sub">实心=已完成，浅色=计划</span>
+                <span class="fx-head-right">${md(bars[0].date)} – ${md(bars[6].date)}</span>
+            </div>
+            <div class="fx-chart"><div class="fx-bars">${cols}</div></div>
+            <div class="fx-chart-foot">
+                <span>已完成 <b>${doneKm} km</b></span>
+                <span>跑了 <b>${doneCount}</b> 次</span>
+                <span>质量课 <b>${quality} 场</b></span>
+                ${showRate ? `<span>完成率 <b>${Math.round(doneKm / planKm * 100)}%</b></span>` : ""}
+            </div>
+            ${td.length ? "" : `<div class="fx-week-hint">还没选训练日 · <a href="#" id="fitWeekGoto">去设置</a></div>`}
+        </div>`;
     }
 
     function renderStatsHtml(data) {
         const m = data.metrics || null;
-        const today = todayStr();
-        const km7 = m && m.last7Km != null ? m.last7Km : (countKm(data.logs, 7) || 0);
-        const km28 = m && m.last28Km != null ? m.last28Km : (countKm(data.logs, 28) || 0);
-        const runCount7 = m && m.runCount7 != null ? m.runCount7 : (countRuns(data.logs, 7) || 0);
-        const lr = loadRatio(data.logs || []);
         const coaching = getTodayCoaching(data);
-        const acwr = coaching && coaching.load && coaching.load.acwr != null
-            ? coaching.load.acwr
-            : (lr && lr.ratio ? lr.ratio.toFixed(2) : "—");
-        const acwrTone = (coaching && coaching.load && coaching.load.acwr != null)
-            ? (coaching.load.acwr > 1.3 ? "bad" : coaching.load.acwr < 0.8 ? "ok" : "good")
-            : (!lr ? "" : (lr.ratio > 1.3 ? "bad" : lr.ratio < 0.8 ? "ok" : "good"));
+        const lr = loadRatio(data.logs || []);
+        const load = (coaching && coaching.load) || null;
+        const acwr = (load && load.acwr != null) ? load.acwr : (lr && lr.ratio != null ? lr.ratio : null);
+        const km7 = (m && m.last7Km != null) ? m.last7Km : countKm(data.logs, 7);
+        const km28 = (m && m.last28Km != null) ? m.last28Km : countKm(data.logs, 28);
+        if (acwr == null) {
+            return `<div class="fx-card">
+                <div class="fx-head"><h3>负荷平衡</h3></div>
+                <div class="fx-gauge-legend">还没有足够数据算负荷比（需要近 28 天的跑量记录）。</div>
+                <div class="fx-load-row">
+                    <div class="fx-load-item"><span>近 7 天跑量</span><b>${km7}<small>km</small></b></div>
+                    <div class="fx-load-item"><span>近 28 天跑量</span><b>${km28}<small>km</small></b></div>
+                </div>
+            </div>`;
+        }
+        const acute = load ? (Number(load.atlRun || 0) + Number(load.atlStr || 0)) : null;
+        const chronic = load ? load.ctlTotal : null;
+        const tsb = load ? load.tsb : null;
+        const zone = acwr < 0.8 ? "量偏少" : acwr <= 1.3 ? "安全区" : acwr <= 1.5 ? "偏高" : "高危";
+        const tsbTxt = tsb == null ? "—" : (tsb > 5 ? "状态新鲜" : tsb >= -10 ? "正常" : tsb >= -30 ? "疲劳累积" : "过度疲劳");
+        const fmt1 = x => (x == null || !isFinite(x)) ? "—" : (Math.round(x * 10) / 10).toFixed(1);
 
-        return `<div class="fit-stats">
-            <div class="fit-stat">
-                <div class="fit-stat-num">${km7}<small>km</small></div>
-                <div class="fit-stat-label">近 7 天</div>
+        return `<div class="fx-card">
+            <div class="fx-head">
+                <h3>负荷平衡</h3>
+                <span class="fx-head-sub">急性负荷(7天) ÷ 慢性负荷(28天)</span>
+                <span class="fx-head-right">当前 ${zone}</span>
             </div>
-            <div class="fit-stat">
-                <div class="fit-stat-num">${runCount7}<small>次</small></div>
-                <div class="fit-stat-label">本周跑步</div>
+            ${acwrGauge(acwr)}
+            <div class="fx-load-row">
+                <div class="fx-load-item"><span>急性负荷</span><b>${fmt1(acute)}<small>7天</small></b></div>
+                <div class="fx-load-item"><span>慢性负荷</span><b>${fmt1(chronic)}<small>28天</small></b></div>
+                <div class="fx-load-item"><span>疲劳平衡 TSB</span><b>${fmt1(tsb)}<small>${tsbTxt}</small></b></div>
+                <div class="fx-load-item"><span>近 7 天跑量</span><b>${km7}<small>km</small></b></div>
+                <div class="fx-load-item"><span>近 28 天跑量</span><b>${km28}<small>km</small></b></div>
             </div>
-            <div class="fit-stat">
-                <div class="fit-stat-num">${km28}<small>km</small></div>
-                <div class="fit-stat-label">近 28 天</div>
-            </div>
-            <div class="fit-stat ${acwrTone}">
-                <div class="fit-stat-num">${acwr}</div>
-                <div class="fit-stat-label">负荷比<br><span class="fit-stat-sub">0.8-1.3</span></div>
-            </div>
+            <div class="fx-gauge-legend" style="margin-top:12px">安全区 0.8–1.3；高于 1.5 属高危，需要减量或休息。</div>
         </div>`;
     }
 
@@ -682,6 +903,7 @@ const Fitness = (() => {
         // 今天这一行用 coach 的权威结果（已考虑准备度 + ACWR），否则退回 suggestWorkout
         const coaching = getTodayCoaching(data);
         const todaySuggested = suggestWorkout(data);
+
         const rows = plan.map(p => {
             let item;
             if (p.date === t) {
@@ -691,8 +913,7 @@ const Fitness = (() => {
                         name: coaching.session.name,
                         km: coaching.session.km || 0,
                         pace: coaching.session.pace != null ? fmtPace(coaching.session.pace) : null,
-                        detail: coaching.session.detail || p.detail,
-                        overload: (coaching.flags || []).length > 0
+                        detail: coaching.session.detail || p.detail
                     };
                 } else {
                     item = {
@@ -700,40 +921,90 @@ const Fitness = (() => {
                         name: todaySuggested.headline,
                         km: todaySuggested.km || 0,
                         pace: typeof todaySuggested.pace === "number" ? fmtPace(todaySuggested.pace) : (todaySuggested.pace || null),
-                        detail: todaySuggested.detail || p.detail,
-                        overload: todaySuggested.overload
+                        detail: todaySuggested.detail || p.detail
                     };
                 }
             } else {
-                item = p;
+                item = {
+                    type: p.type,
+                    name: p.name || (TYPES[p.type] || {}).name || p.type,
+                    km: p.km || 0,
+                    // 云端 plan 的 pace 是「秒/公里」数字，本地 generatePlan 已是格式化字符串
+                    pace: p.pace != null ? (typeof p.pace === "number" ? fmtPace(p.pace) : p.pace) : null,
+                    detail: p.detail || ""
+                };
             }
-            const T = TYPES[item.type] || TYPES.easy;
             const dObj = parseDate(p.date);
-            const label = dObj ? `${dObj.getMonth() + 1}月${dObj.getDate()}日 · 周${WEEK_NAMES[p.wd]}` : p.date;
-            const isToday = p.date === t;
-            // 云端 plan 的 pace 是「秒/公里」数字，本地 generatePlan 已是格式化字符串，统一处理
-            const paceStr = item.pace != null
-                ? (typeof item.pace === "number" ? fmtPace(item.pace) : item.pace)
-                : null;
-            const meta = item.km ? `${item.km} km${paceStr ? " · " + paceStr + "/km" : ""}` : "—";
-            const overloadFlag = (p.flags && p.flags.length) ? true : item.overload;
-            return `<div class="fit-plan-day ${isToday ? "today" : ""} ${overloadFlag ? "overload" : ""}" data-date="${p.date}">
-                <div class="fit-plan-row">
-                    <span class="fit-plan-date">${label}${isToday ? " <b>今天</b>" : ""}</span>
-                    <span class="fit-plan-type t-${item.type}">${T.icon} ${escapeHtml(item.name)}</span>
-                    <span class="fit-plan-meta">${meta}</span>
-                    <span class="fit-plan-caret">▾</span>
+            const flags = (p.flags && p.flags.length) ? p.flags.slice()
+                : (item.overload ? ["负荷比超出安全区 0.8-1.3"] : []);
+            return {
+                date: p.date,
+                type: item.type,
+                name: item.name || (TYPES[item.type] || TYPES.easy).name,
+                km: Number(item.km) || 0,
+                pace: item.pace,
+                detail: item.detail || "",
+                flags,
+                gate: flags.some(f => /闸门/.test(f)),
+                isToday: p.date === t,
+                label: dObj ? `${dObj.getMonth() + 1}/${dObj.getDate()} 周${WEEK_NAMES[p.wd]}` : p.date
+            };
+        });
+
+        // 按自然周分组（周一起），周头显示该周总量
+        const groups = [];
+        const mondayKey = d => {
+            const m = new Date(d.getTime());
+            m.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+            return m;
+        };
+        const tMon = mondayKey(parseDate(t) || new Date());
+        rows.forEach(r => {
+            const d = parseDate(r.date) || new Date();
+            const mon = mondayKey(d);
+            const key = mon.getFullYear() + "-" + pad2(mon.getMonth() + 1) + "-" + pad2(mon.getDate());
+            let g = groups.find(x => x.key === key);
+            if (!g) {
+                const sun = new Date(mon.getTime()); sun.setDate(mon.getDate() + 6);
+                g = {
+                    key,
+                    title: `${mon.getMonth() + 1}/${mon.getDate()} – ${sun.getMonth() + 1}/${sun.getDate()}`,
+                    isThis: mon.getTime() === tMon.getTime(),
+                    items: []
+                };
+                groups.push(g);
+            }
+            g.items.push(r);
+        });
+
+        const html = groups.map(g => {
+            const km = Math.round(g.items.reduce((s, x) => s + x.km, 0) * 10) / 10;
+            const q = g.items.filter(x => ["tempo", "interval", "long"].includes(x.type)).length;
+            const list = g.items.map(r => `<div class="fx-day fx-tone-${toneOf(r.type)}${r.isToday ? " today" : ""}" data-date="${r.date}">
+                <div class="fx-day-row">
+                    <span class="fx-day-date">${r.label}${r.isToday ? ' <b>今天</b>' : ""}</span>
+                    <span class="fx-day-dot${r.type === "rest" ? " off" : ""}"></span>
+                    <span class="fx-day-type">${icon(iconOf(r.type))} ${escapeHtml(r.name)}</span>
+                    <span class="fx-day-meta">${r.type === "rest" ? "休息" : `<b>${r.km}</b> km${r.pace ? " · " + r.pace + "/km" : ""}`}</span>
+                    ${r.gate ? `<span class="fx-chip gate">闸门</span>` : ""}
+                    <span class="fx-day-caret">${icon("chevron")}</span>
                 </div>
-                <div class="fit-plan-detail hidden">
-                    <div class="fit-plan-detail-text">${escapeHtml(item.detail || "")}</div>
-                    ${overloadFlag ? `<div class="fit-warn" style="margin-top:6px">⚠ ${(p.flags || []).join(" · ") || "负荷比过高，已自动降量"}</div>` : ""}
-                    ${item.type !== "rest" && item.type !== "recovery" && !isToday ? `<button class="fit-plan-push btn btn-ghost btn-xs" data-date="${p.date}" type="button" title="推到佳明 Connect，同步后手表上跟着练">⌚ 推到佳明</button>` : ""}
-                    ${isToday && item.type !== "rest" && item.type !== "recovery" ? `<button class="fit-plan-push btn btn-ghost btn-xs" data-date="${p.date}" type="button" title="把今天降量后的课表推到手表">⌚ 推到佳明</button>` : ""}
+                <div class="fx-day-detail hidden">
+                    <div>${escapeHtml(r.detail).replace(/\n/g, "<br>")}</div>
+                    ${r.flags.length ? `<div class="fx-chip-row">${r.flags.map(f =>
+                        `<span class="fx-chip${/闸门/.test(f) ? " gate" : ""}">${escapeHtml(String(f).replace(/^守闸门[:：]\s*/, "闸门 · "))}</span>`).join("")}</div>` : ""}
+                    ${r.type !== "rest" ? `<div class="fx-detail-actions"><button class="fx-btn fit-plan-push" data-date="${r.date}" type="button">${icon("watch")} 推到佳明手表</button></div>` : ""}
                 </div>
-            </div>`;
+            </div>`).join("");
+            return `<div class="fx-week"><b>${g.title}</b>${g.isThis ? " · 本周" : ""}<span class="fx-week-total">合计 <b>${km} km</b> · 质量课 ${q} 场</span></div>${list}`;
         }).join("");
-        const source = (Array.isArray(cloudPlan) && cloudPlan.length) ? "新算法（coach.py）" : "本地估算";
-        return `<div class="fit-plan-head">未来两周计划 <span class="fit-plan-sub">${source} · 点开某天看课表，可推到手表</span></div><div class="fit-plan-list">${rows}</div>`;
+
+        const source = (Array.isArray(cloudPlan) && cloudPlan.length) ? "coach.py 算法" : "本地估算";
+        return `<div class="fx-head" style="margin:22px 0 10px">
+                <h3>未来两周计划</h3>
+                <span class="fx-head-sub">${source} · 点开某天看分段配速，可推到手表</span>
+            </div>
+            <div class="fx-plan">${html}</div>`;
     }
 
     // 推送到佳明：写 pushWorkout 请求，由守护进程调 push_workout.py 上传
@@ -764,22 +1035,33 @@ const Fitness = (() => {
                 fit.pushWorkout = data.pushWorkout;
                 payload.fitness = fit;
                 await c.from("sync_data").upsert({ id: syncId, payload, updated_at: new Date().toISOString() });
-            } catch (e) { console.error("pushWorkout 写云端失败:", e); }
+                Api.showToast("已提交，稍后会推到你佳明的训练计划里（去手表/App 同步后即可跟着练）", "success");
+                return;
+            } catch (e) {
+                console.error("pushWorkout 写云端失败:", e);
+                Api.showToast("写云端失败：" + (e.message || "网络问题") + "，可让我直接推", "error");
+                return;
+            }
         }
-        Api.showToast("已提交，稍后会推到你佳明的训练计划里（去手表/App 同步后即可跟着练）", "success");
+        Api.showToast("已记录到本地，但云端同步未开启，守护进程收不到", "error");
     }
 
+    // 绑定挂在整张卡片上：计划行的展开、今日课表的推送按钮都能命中
     function bindPlanEvents() {
-        const box = els.plan();
+        const box = document.getElementById("fitnessCard") || els.plan();
         if (!box || box._bound) return;
         box._bound = true;
         box.addEventListener("click", e => {
             const pushBtn = e.target.closest(".fit-plan-push");
             if (pushBtn) { e.stopPropagation(); requestPushWorkout(pushBtn.dataset.date); return; }
-            const day = e.target.closest(".fit-plan-day");
-            if (day) {
-                const detail = day.querySelector(".fit-plan-detail");
-                if (detail) detail.classList.toggle("hidden");
+            const row = e.target.closest(".fx-day-row") || e.target.closest(".fit-plan-row");
+            if (!row) return;
+            const day = row.closest(".fx-day") || row.closest(".fit-plan-day");
+            if (!day) return;
+            const detail = day.querySelector(".fx-day-detail") || day.querySelector(".fit-plan-detail");
+            if (detail) {
+                detail.classList.toggle("hidden");
+                day.classList.toggle("open", !detail.classList.contains("hidden"));
             }
         });
     }
