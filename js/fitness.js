@@ -684,6 +684,9 @@ const Fitness = (() => {
             if (/闸门/.test(f)) {
                 return { cls: "", ic: "shield", title: "闸门", text: String(f).replace(/^守闸门[:：]\s*/, "") };
             }
+            if (/参考意义有限|基数/.test(f)) {   // 基数薄时只是说明，不是危险
+                return { cls: "", ic: "info", title: "负荷说明", text: String(f) };
+            }
             if (/ACWR|负荷|安全区/.test(f)) {
                 return { cls: " warn", ic: "alert", title: "负荷提醒", text: String(f) };
             }
@@ -812,6 +815,24 @@ const Fitness = (() => {
         </div>`;
     }
 
+    // 上一自然周（周一~周日）的实际跑量，用来和本周计划做对比
+    function lastWeekKm(data, today) {
+        const logs = data.logs || [];
+        const t0 = parseDate(today) || new Date();
+        const mon = new Date(t0.getTime());
+        mon.setDate(t0.getDate() - ((t0.getDay() + 6) % 7) - 7);
+        let s = 0, runs = 0;
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(mon.getTime());
+            d.setDate(mon.getDate() + i);
+            const ds = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+            const day = logs.filter(l => l.date === ds);
+            s += day.reduce((a, l) => a + (Number(l.km) || 0), 0);
+            if (day.length) runs += day.length;
+        }
+        return { km: Math.round(s * 10) / 10, runs };
+    }
+
     function renderStatsHtml(data) {
         const m = data.metrics || null;
         const coaching = getTodayCoaching(data);
@@ -833,9 +854,23 @@ const Fitness = (() => {
         const acute = load ? (Number(load.atlRun || 0) + Number(load.atlStr || 0)) : null;
         const chronic = load ? load.ctlTotal : null;
         const tsb = load ? load.tsb : null;
-        const zone = acwr < 0.8 ? "量偏少" : acwr <= 1.3 ? "安全区" : acwr <= 1.5 ? "偏高" : "高危";
+        const thin = !!(load && load.baseThin);
+        const histDays = load && load.days ? load.days : null;
+        const trend = load ? load.acwrTrend : null;
+        const zone = acwr < 0.8 ? "量偏少"
+            : acwr <= 1.3 ? "安全区"
+                : (thin ? "偏高（基数薄）" : (acwr <= 1.5 ? "偏高" : "高危"));
         const tsbTxt = tsb == null ? "—" : (tsb > 5 ? "状态新鲜" : tsb >= -10 ? "正常" : tsb >= -30 ? "疲劳累积" : "过度疲劳");
         const fmt1 = x => (x == null || !isFinite(x)) ? "—" : (Math.round(x * 10) / 10).toFixed(1);
+        const trendTxt = (trend == null) ? "还没有 7 天前的数据可比"
+            : (trend < -0.05 ? `较 7 天前在降 ${Math.abs(trend).toFixed(2)}`
+                : trend > 0.05 ? `较 7 天前在涨 ${trend.toFixed(2)}`
+                    : "与 7 天前基本持平");
+        const trendCls = (trend == null) ? "" : (trend < -0.05 ? "good" : trend > 0.05 ? "down" : "");
+        // 上周实际 vs 本周计划：比 ACWR 更直观的「有没有跳量」
+        const lw = lastWeekKm(data, todayStr());
+        const planKmWeek = weekVolume(data, todayStr()).reduce((s, b) => s + b.plan, 0);
+        const jump = (lw.km > 0 && planKmWeek > 0) ? Math.round((planKmWeek / lw.km - 1) * 100) : null;
 
         return `<div class="fx-card">
             <div class="fx-head">
@@ -852,7 +887,15 @@ const Fitness = (() => {
                 <div class="fx-load-item"><span>近 7 天跑量</span><b>${km7}<small>km</small></b></div>
                 <div class="fx-load-item"><span>近 28 天跑量</span><b>${km28}<small>km</small></b></div>
             </div>
-            <div class="fx-gauge-legend" style="margin-top:12px">安全区 0.8–1.3；高于 1.5 属高危，需要减量或休息。</div>
+            <div class="fx-gauge-legend" style="margin-top:12px">
+                <span class="fx-mtl-d ${trendCls}" style="display:inline">${escapeHtml(trendTxt)}</span>
+                ${jump != null ? `　·　上周实际 <b>${lw.km} km</b> → 本周计划 <b>${Math.round(planKmWeek * 10) / 10} km</b>（${jump > 0 ? "+" : ""}${jump}%）` : ""}
+            </div>
+            <div class="fx-gauge-legend" style="margin-top:8px">
+                ${thin
+                    ? `你的训练记录只有 ${histDays || "?"} 天（不足 6 周），慢性负荷这半个多月才从 0 慢慢长起来 —— 分母偏小，比值天然偏高，别按「高危」理解。真正该盯的是「周跑量别跳」（一般每周增幅别超 10%）。`
+                    : `安全区 0.8–1.3；高于 1.5 属高危，需要减量或休息。`}
+            </div>
         </div>`;
     }
 
