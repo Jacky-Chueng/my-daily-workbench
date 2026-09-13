@@ -360,7 +360,20 @@ const Fitness = (() => {
         shield: '<path d="M8 1.7 3.4 3.5v4c0 3 1.8 5.5 4.6 6.8 2.8-1.3 4.6-3.8 4.6-6.8v-4z"/>',
         alert: '<path d="M8 2.2 14 13H2z"/><path d="M8 6.4v3M8 11.3h.01"/>',
         info: '<circle cx="8" cy="8" r="6.2"/><path d="M8 7.3v4.1M8 4.8h.01"/>',
-        chevron: '<path d="M4.2 6.4 8 10.2l3.8-3.8"/>'
+        chevron: '<path d="M4.2 6.4 8 10.2l3.8-3.8"/>',
+        pulse: '<path d="M1.6 8.6h2.6l1.4-3.4L8 12.2l1.7-5.1 1.1 1.5h2.6"/>',
+        heart: '<path d="M8 13.3C8 13.3 2.4 10.1 2.4 6.4A2.9 2.9 0 0 1 8 5.1a2.9 2.9 0 0 1 5.6 1.3c0 3.7-5.6 6.9-5.6 6.9z"/>',
+        moon: '<path d="M12.8 9.6A5.7 5.7 0 0 1 6.2 2a5.7 5.7 0 1 0 6.6 7.6z"/>',
+        battery: '<rect x="1.8" y="5" width="10.4" height="6.4" rx="1.8"/><path d="M14.4 7v2.4"/><path d="M5 8h3.4"/>',
+        gauge: '<path d="M2.6 11.6a5.4 5.4 0 0 1 10.8 0"/><path d="M8 11.6 10.6 8"/><circle cx="8" cy="11.8" r="0.9" fill="currentColor"/>',
+        lungs: '<path d="M8 2.6v5.2"/><path d="M6.6 6.2 4 8.4c-1.1.9-1.4 2.4-.8 3.6.5 1 1.7 1.4 2.7.9L7 12.4c.6-.3 1-.9 1-1.6V6.9"/><path d="M9.4 6.2 12 8.4c1.1.9 1.4 2.4.8 3.6-.5 1-1.7 1.4-2.7.9L9 12.4c-.6-.3-1-.9-1-1.6V6.9"/>',
+        calendar: '<rect x="2.2" y="3.4" width="11.6" height="10.4" rx="2"/><path d="M2.2 6.6h11.6M5.4 2.2v2.4M10.6 2.2v2.4"/>',
+        chart: '<path d="M2.2 13.4h11.6"/><path d="M4.6 13.4V8.6M8 13.4V3.6M11.4 13.4v-3.2"/>',
+        scale: '<path d="M2.4 12.6h11.2"/><path d="M4.4 12.6 6.4 4.2h3.2l2 8.4"/><path d="M8 4.2V2.4"/>',
+        sun: '<circle cx="8" cy="8" r="2.8"/><path d="M8 1.6v1.4M8 13v1.4M1.6 8h1.4M13 8h1.4M3.5 3.5l1 1M11.5 11.5l1 1M12.5 3.5l-1 1M4.5 11.5l-1 1"/>',
+        drop: '<path d="M8 2.2c2 2.4 3.4 4.2 3.4 6.1A3.4 3.4 0 0 1 4.6 8.3c0-1.9 1.4-3.7 3.4-6.1z"/>',
+        target: '<circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="2"/>',
+        shoe: '<path d="M1.8 11.6h12.4v1.6H1.8z"/><path d="M2.6 11.6V8.2c0-1 .6-1.9 1.6-2.3l2.3-1 .8 1.5 2.9.6c1.5.3 2.6 1.6 2.6 3.1v1.5"/>'
     };
     function icon(key, cls) {
         return `<svg class="${cls || ""}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key] || ICONS.info}</svg>`;
@@ -546,69 +559,87 @@ const Fitness = (() => {
         const notes = coaching ? (coaching.readinessNotes || []) : local.notes;
         const inputs = coaching ? coaching.readinessInputs : local.inputs;
         const hb = (coaching && coaching.hrv) || null;
+        const dTxt = d => d ? `<span class="fx-mtl-d ${d.cls}">${escapeHtml(d.txt)}</span>` : "";
 
-        const cells = [
+        // 图标化的健康指标卡片（一屏内直接摆开，不用点）
+        const tiles = [
             {
-                k: "HRV", v: m.hrv, unit: "ms",
-                pct: clampPct(m.hrv / ((hb && hb.bandHigh) || m.hrvBandHigh || (m.hrvBaseline ? m.hrvBaseline * 1.2 : 150))),
+                k: "HRV", v: m.hrv, unit: "ms", ic: "pulse", tint: "a",
                 d: deltaInfo(m.hrv, (hb && hb.mu) || m.hrvBaseline, true),
-                sub: hb ? `正常带 ${Math.round(hb.bandLow)}–${Math.round(hb.bandHigh)}` : null
+                pct: clampPct(m.hrv / ((hb && hb.bandHigh) || m.hrvBandHigh || (m.hrvBaseline ? m.hrvBaseline * 1.2 : 150)))
             },
             {
-                k: "静息心率", v: m.rhr, unit: "bpm",
-                pct: clampPct(m.rhr && m.rhrBaseline ? m.rhr / (m.rhrBaseline * 1.4) : null),
-                d: deltaInfo(m.rhr, m.rhrBaseline, false)
+                k: "静息心率", v: m.rhr, unit: "bpm", ic: "heart", tint: "b",
+                d: deltaInfo(m.rhr, m.rhrBaseline, false),
+                pct: clampPct(m.rhr && m.rhrBaseline ? m.rhr / (m.rhrBaseline * 1.4) : null)
             },
             {
-                k: "睡眠", v: m.sleepScore != null ? m.sleepScore : (m.sleepHours != null ? m.sleepHours : null),
-                unit: m.sleepScore != null ? "分" : (m.sleepHours != null ? "h" : ""),
-                pct: clampPct(m.sleepScore != null ? m.sleepScore / 100 : (m.sleepHours ? m.sleepHours / 9 : null)),
-                d: (m.sleepHours != null && m.sleepScore != null) ? { txt: m.sleepHours + " 小时", cls: "" } : null
+                k: "睡眠", v: m.sleepScore != null ? m.sleepScore : m.sleepHours, unit: m.sleepScore != null ? "分" : "h",
+                ic: "moon", tint: "c",
+                d: (m.sleepHours != null && m.sleepScore != null) ? { txt: m.sleepHours + " 小时", cls: "" } : null,
+                pct: clampPct(m.sleepScore != null ? m.sleepScore / 100 : (m.sleepHours ? m.sleepHours / 9 : null))
             },
             {
-                k: "身体电量", v: m.bodyBattery, unit: "",
-                pct: clampPct(m.bodyBattery != null ? m.bodyBattery / 100 : null),
-                d: m.bodyBattery != null ? { txt: m.bodyBattery < 40 ? "偏低" : "正常", cls: m.bodyBattery < 40 ? "down" : "good" } : null
+                k: "身体电量", v: m.bodyBattery, unit: "", ic: "battery", tint: "d",
+                d: m.bodyBattery != null ? { txt: m.bodyBattery < 40 ? "偏低" : "正常", cls: m.bodyBattery < 40 ? "down" : "good" } : null,
+                pct: clampPct(m.bodyBattery != null ? m.bodyBattery / 100 : null)
             },
             {
-                k: "压力", v: m.stress, unit: "",
-                pct: clampPct(m.stress != null ? m.stress / 100 : null),
-                d: m.stress != null ? { txt: m.stress > 50 ? "偏高" : "低", cls: m.stress > 50 ? "down" : "good" } : null,
-                bad: m.stress != null && m.stress > 50
+                k: "压力", v: m.stress, unit: "", ic: "gauge", tint: "e",
+                d: m.stress != null ? { txt: m.stress > 50 ? "偏高" : "放松", cls: m.stress > 50 ? "down" : "good" } : null,
+                pct: clampPct(m.stress != null ? m.stress / 100 : null)
+            },
+            {
+                k: "VO2max", v: m.vo2max, unit: "", ic: "lungs", tint: "f",
+                d: m.vo2maxDate ? { txt: m.vo2maxDate.slice(5).replace("-", "/") + " 测", cls: "" } : null,
+                pct: clampPct(m.vo2max != null ? m.vo2max / 60 : null)
+            },
+            {
+                k: "佳明准备度", v: m.garminReadiness, unit: "",
+                ic: "target", tint: "g",
+                d: m.garminReadinessLevel ? { txt: m.garminReadinessLevel, cls: "" } : null,
+                pct: clampPct(m.garminReadiness != null ? m.garminReadiness / 100 : null)
+            },
+            {
+                k: "天气", v: m.weather ? Math.round(m.weather.temp) : null, unit: "℃",
+                ic: m.weather && m.weather.dewPoint >= 21 ? "drop" : "sun", tint: "h",
+                d: m.weather ? { txt: `露点 ${Math.round(m.weather.dewPoint)}° 湿度 ${Math.round(m.weather.humidity)}%`, cls: m.weather.dewPoint >= 21 ? "down" : "" } : null,
+                pct: m.weather ? clampPct(m.weather.humidity / 100) : null
             }
-        ];
+        ].filter(t => t.v != null || t.k === "天气");
 
         return `<div class="fx-card plain">
             <div class="fx-head">
+                <span class="fx-head-ico fx-tint-g">${icon("pulse")}</span>
                 <h3>训练状态</h3>
                 <span class="fx-head-sub">佳明今晨数据</span>
                 ${coaching && coaching.weeksOut != null
                     ? `<span class="fx-head-right">${escapeHtml(phaseName(coaching.phase))} · 距比赛 ${Math.round(coaching.weeksOut)} 周</span>`
                     : ""}
             </div>
-            <div class="fx-status">
-                <div>
-                    <div class="fx-ring">
-                        ${ringSvg(score, tone)}
-                        <div class="fx-ring-mid">
-                            <span class="fx-ring-num">${score != null ? score : "—"}</span>
-                            <span class="fx-ring-max">/ 10</span>
-                        </div>
+            <div class="fx-statusbar">
+                <div class="fx-ring sm">
+                    ${ringSvg(score, tone)}
+                    <div class="fx-ring-mid">
+                        <span class="fx-ring-num">${score != null ? score : "—"}</span>
+                        <span class="fx-ring-max">/ 10</span>
                     </div>
-                    <div class="fx-ring-cap"><b>${escapeHtml(label)}</b>${inputs ? inputs + " 项数据综合" : ""}</div>
                 </div>
-                <div>
-                    <div class="fx-metrics">
-                        ${cells.map(c => `<div class="fx-metric${c.bad ? " is-bad" : ""}">
-                            <div class="fx-metric-k">${c.k}</div>
-                            <div class="fx-metric-v">${c.v != null ? c.v : "—"}${c.unit ? `<small>${c.unit}</small>` : ""}</div>
-                            ${c.d ? `<div class="fx-metric-d ${c.d.cls}">${escapeHtml(c.d.txt)}</div>`
-                                  : (c.sub ? `<div class="fx-metric-d">${escapeHtml(c.sub)}</div>` : `<div class="fx-metric-d">—</div>`)}
-                            <div class="fx-metric-track"><i style="width:${c.pct}%"></i></div>
-                        </div>`).join("")}
-                    </div>
+                <div class="fx-statusbar-txt">
+                    <div class="fx-statusbar-label">${escapeHtml(label)}${inputs ? `<span> · ${inputs} 项数据综合</span>` : ""}</div>
                     ${notes.length ? `<div class="fx-notes">${notes.map(n => `<div class="fx-note">${escapeHtml(n)}</div>`).join("")}</div>` : ""}
                 </div>
+            </div>
+            <div class="fx-mtiles">
+                ${tiles.map(t => `<div class="fx-mtl fx-tint-${t.tint}">
+                    <span class="fx-mtl-ico">${icon(t.ic)}</span>
+                    <div class="fx-mtl-txt">
+                        <div class="fx-mtl-v">${t.v != null ? t.v : "—"}${t.unit ? `<small>${t.unit}</small>` : ""}</div>
+                        <div class="fx-mtl-k">${escapeHtml(t.k)}</div>
+                        ${dTxt(t.d)}
+                    </div>
+                    <div class="fx-mtl-track"><i style="width:${t.pct}%"></i></div>
+                </div>`).join("")}
             </div>
         </div>`;
     }
@@ -765,6 +796,7 @@ const Fitness = (() => {
         };
         return `<div class="fx-card">
             <div class="fx-head">
+                <span class="fx-head-ico fx-tint-c">${icon("chart")}</span>
                 <h3>本周训练量</h3>
                 <span class="fx-head-sub">实心=已完成，浅色=计划</span>
                 <span class="fx-head-right">${md(bars[0].date)} – ${md(bars[6].date)}</span>
@@ -807,6 +839,7 @@ const Fitness = (() => {
 
         return `<div class="fx-card">
             <div class="fx-head">
+                <span class="fx-head-ico fx-tint-e">${icon("scale")}</span>
                 <h3>负荷平衡</h3>
                 <span class="fx-head-sub">急性负荷(7天) ÷ 慢性负荷(28天)</span>
                 <span class="fx-head-right">当前 ${zone}</span>
@@ -1000,11 +1033,33 @@ const Fitness = (() => {
         }).join("");
 
         const source = (Array.isArray(cloudPlan) && cloudPlan.length) ? "coach.py 算法" : "本地估算";
-        return `<div class="fx-head" style="margin:22px 0 10px">
-                <h3>未来两周计划</h3>
-                <span class="fx-head-sub">${source} · 点开某天看分段配速，可推到手表</span>
+        const totalKm = Math.round(rows.reduce((s, r) => s + r.km, 0) * 10) / 10;
+        const quality = rows.filter(r => ["tempo", "interval", "long"].includes(r.type)).length;
+        const restDays = rows.filter(r => r.type === "rest").length;
+        const mini = rows.map(r => `<i class="fx-tone-${toneOf(r.type)}${r.isToday ? " now" : ""}${r.km ? "" : " idle"}"
+            title="${r.label} · ${r.km ? r.km + " km" : "休息"}"></i>`).join("");
+        const open = isPlanOpen();
+        return `<div class="fx-card fx-fold${open ? " open" : ""}" id="fxPlanFold">
+            <div class="fx-fold-head" role="button" tabindex="0" aria-expanded="${open ? "true" : "false"}">
+                <span class="fx-fold-ico">${icon("calendar")}</span>
+                <div class="fx-fold-txt">
+                    <b>训练计划</b>
+                    <span>未来两周 ${rows.length} 天 · 合计 <em>${totalKm} km</em> · 质量课 ${quality} 场 · 休息 ${restDays} 天</span>
+                </div>
+                <span class="fx-fold-caret">${icon("chevron")}</span>
             </div>
-            <div class="fx-plan">${html}</div>`;
+            <div class="fx-fold-mini">${mini}</div>
+            <div class="fx-fold-body${open ? "" : " hidden"}">
+                <div class="fx-fold-note">${source} · 点开某天看分段配速，可推到手表</div>
+                <div class="fx-plan">${html}</div>
+            </div>
+        </div>`;
+    }
+
+    // 训练计划面板的开合状态（记住用户的选择，默认收起）
+    function isPlanOpen() {
+        try { return localStorage.getItem("dw_fit_plan_open") === "1"; }
+        catch (e) { return false; }
     }
 
     // 推送到佳明：写 pushWorkout 请求，由守护进程调 push_workout.py 上传
@@ -1046,12 +1101,24 @@ const Fitness = (() => {
         Api.showToast("已记录到本地，但云端同步未开启，守护进程收不到", "error");
     }
 
-    // 绑定挂在整张卡片上：计划行的展开、今日课表的推送按钮都能命中
+    // 绑定挂在整张卡片上：计划行的展开、训练计划面板的开合、今日课表的推送按钮都能命中
     function bindPlanEvents() {
         const box = document.getElementById("fitnessCard") || els.plan();
         if (!box || box._bound) return;
         box._bound = true;
+        const toggleFold = head => {
+            const fold = head.closest(".fx-fold");
+            const body = fold && fold.querySelector(".fx-fold-body");
+            if (!body) return;
+            const willOpen = body.classList.contains("hidden");
+            body.classList.toggle("hidden", !willOpen);
+            fold.classList.toggle("open", willOpen);
+            head.setAttribute("aria-expanded", willOpen ? "true" : "false");
+            try { localStorage.setItem("dw_fit_plan_open", willOpen ? "1" : "0"); } catch (e) { }
+        };
         box.addEventListener("click", e => {
+            const foldHead = e.target.closest(".fx-fold-head");
+            if (foldHead) { toggleFold(foldHead); return; }
             const pushBtn = e.target.closest(".fit-plan-push");
             if (pushBtn) { e.stopPropagation(); requestPushWorkout(pushBtn.dataset.date); return; }
             const row = e.target.closest(".fx-day-row") || e.target.closest(".fit-plan-row");
@@ -1062,6 +1129,14 @@ const Fitness = (() => {
             if (detail) {
                 detail.classList.toggle("hidden");
                 day.classList.toggle("open", !detail.classList.contains("hidden"));
+            }
+        });
+        // 键盘也能开合训练计划
+        box.addEventListener("keydown", e => {
+            const foldHead = e.target.closest(".fx-fold-head");
+            if (foldHead && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                toggleFold(foldHead);
             }
         });
     }

@@ -127,44 +127,87 @@
 .fx-btn.done { border-color: var(--success); color: var(--success); background: var(--success-soft); }
 
 /* =====================================================================
-   2. 训练状态（准备度环 + 指标）
+   2. 训练状态（准备度 + 图标化健康指标）
    ===================================================================== */
-.fx-status { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 20px; align-items: center; }
-.fx-ring { position: relative; width: 128px; height: 128px; }
+/* 图标色板：一个 --tint 主色 + --tint-bg 底色，图标和数值都用它上色 */
+.fx-tint-a { --tint: #8f7cb8; --tint-bg: var(--lavender-soft); }            /* HRV */
+.fx-tint-b { --tint: #b0726a; --tint-bg: var(--danger-soft); }              /* 静息心率 */
+.fx-tint-c { --tint: #6f8290; --tint-bg: rgba(122, 134, 148, .16); }        /* 睡眠 */
+.fx-tint-d { --tint: #6f8a69; --tint-bg: var(--success-soft); }             /* 身体电量 */
+.fx-tint-e { --tint: #b98f3e; --tint-bg: rgba(196, 168, 120, .22); }        /* 压力 */
+.fx-tint-f { --tint: #7d6bb0; --tint-bg: rgba(184, 168, 212, .26); }        /* VO2max */
+.fx-tint-g { --tint: #7b7f6a; --tint-bg: var(--primary-soft); }             /* 准备度 */
+.fx-tint-h { --tint: #c08a3e; --tint-bg: rgba(196, 168, 120, .18); }        /* 天气 */
+[data-theme="dark"] .fx-tint-a { --tint: #c3b2e4; }
+[data-theme="dark"] .fx-tint-b { --tint: #d3a49d; }
+[data-theme="dark"] .fx-tint-c { --tint: #a6b8c6; }
+[data-theme="dark"] .fx-tint-d { --tint: #a9c2a3; }
+[data-theme="dark"] .fx-tint-e { --tint: #d8bd85; }
+[data-theme="dark"] .fx-tint-f { --tint: #b9a9e0; }
+[data-theme="dark"] .fx-tint-g { --tint: #b6b9a6; }
+[data-theme="dark"] .fx-tint-h { --tint: #dcae67; }
+
+/* 区块标题图标 */
+.fx-head-ico {
+    width: 22px; height: 22px; flex: none;
+    border-radius: 7px;
+    background: var(--tint-bg, var(--primary-soft));
+    color: var(--tint, var(--primary));
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.fx-head-ico svg { width: 13px; height: 13px; }
+
+/* 分数条：小环 + 状态说明 */
+.fx-statusbar { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.fx-statusbar-txt { flex: 1; min-width: 0; }
+.fx-statusbar-label { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+.fx-statusbar-label span { font-size: 11.5px; font-weight: 400; color: var(--text-faint); }
+
+.fx-ring { position: relative; width: 128px; height: 128px; flex: none; }
+.fx-ring.sm { width: 84px; height: 84px; }
 .fx-ring svg { width: 100%; height: 100%; display: block; }
 .fx-ring-mid {
     position: absolute; inset: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .fx-ring-num { font-size: 34px; font-weight: 500; line-height: 1; letter-spacing: -1.5px; color: var(--text); }
+.fx-ring.sm .fx-ring-num { font-size: 24px; letter-spacing: -1px; }
 .fx-ring-max { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
-.fx-ring-cap {
-    text-align: center; margin-top: 10px; font-size: 12px; color: var(--text-soft);
-}
-.fx-ring-cap b { display: block; font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+.fx-ring.sm .fx-ring-max { font-size: 9.5px; margin-top: 1px; }
 
-.fx-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-.fx-metric {
+/* 健康指标网格：图标 + 数值 + 微对比条 */
+.fx-mtiles {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+}
+.fx-mtl {
+    position: relative; overflow: hidden;
     background: var(--bg-card); border: 1px solid var(--border-soft);
-    border-radius: var(--radius-sm); padding: 10px 11px;
+    border-radius: var(--radius-sm); padding: 10px 11px 12px;
+    display: flex; align-items: flex-start; gap: 9px;
 }
-.fx-metric-k {
-    font-size: 10.5px; color: var(--text-faint);
-    display: flex; align-items: center; gap: 4px; white-space: nowrap;
+.fx-mtl-ico {
+    width: 28px; height: 28px; flex: none; border-radius: 9px;
+    background: var(--tint-bg, var(--primary-soft));
+    color: var(--tint, var(--primary));
+    display: inline-flex; align-items: center; justify-content: center;
 }
-.fx-metric-v {
-    font-size: 18px; font-weight: 500; color: var(--text);
-    line-height: 1.2; margin-top: 4px;
-    display: flex; align-items: baseline; gap: 3px;
+.fx-mtl-ico svg { width: 15px; height: 15px; }
+.fx-mtl-txt { min-width: 0; }
+.fx-mtl-v {
+    font-size: 18px; font-weight: 500; line-height: 1.1; color: var(--text);
+    display: flex; align-items: baseline; gap: 2px;
 }
-.fx-metric-v small { font-size: 10px; font-weight: 400; color: var(--text-faint); }
-.fx-metric-d { font-size: 10px; color: var(--text-faint); margin-top: 3px; }
-.fx-metric-d.up { color: var(--warning); }
-.fx-metric-d.down { color: var(--danger); }
-.fx-metric-d.good { color: var(--success); }
-.fx-metric.is-bad { background: var(--danger-soft); border-color: transparent; }
-.fx-metric-track { height: 3px; border-radius: 2px; background: var(--bg-hover); margin-top: 6px; overflow: hidden; }
-.fx-metric-track i { display: block; height: 100%; border-radius: 2px; background: var(--primary); }
+.fx-mtl-v small { font-size: 10px; font-weight: 400; color: var(--text-faint); }
+.fx-mtl-k { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; white-space: nowrap; }
+.fx-mtl-d { display: block; font-size: 10.5px; color: var(--text-soft); margin-top: 2px; }
+.fx-mtl-d.up { color: var(--warning); }
+.fx-mtl-d.down { color: var(--danger); }
+.fx-mtl-d.good { color: var(--success); }
+.fx-mtl-track {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+    background: var(--bg-hover);
+}
+.fx-mtl-track i { display: block; height: 100%; background: var(--tint, var(--primary)); opacity: .55; border-radius: 0 2px 2px 0; }
 
 .fx-notes { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .fx-note {
@@ -261,8 +304,52 @@
 .fx-legend-row em { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
 /* =====================================================================
-   5. 未来两周计划（按周分组）
+   5. 训练计划（默认收起，点标题才展开）
    ===================================================================== */
+.fx-fold { padding: 0; overflow: hidden; }
+.fx-fold-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 15px 18px 12px; cursor: pointer;
+    transition: background .15s var(--ease);
+}
+.fx-fold-head:hover { background: var(--bg-card); }
+.fx-fold-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.fx-fold-ico {
+    width: 34px; height: 34px; flex: none; border-radius: 11px;
+    background: var(--lavender-soft); color: var(--lavender-dark);
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.fx-fold-ico svg { width: 17px; height: 17px; }
+.fx-fold-txt { flex: 1; min-width: 0; }
+.fx-fold-txt b { display: block; font-size: 13.5px; font-weight: 500; color: var(--text); }
+.fx-fold-txt span { display: block; font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
+.fx-fold-txt em { font-style: normal; color: var(--text-soft); font-weight: 500; }
+.fx-fold-caret {
+    color: var(--text-faint); display: inline-flex;
+    transition: transform .22s var(--ease);
+}
+.fx-fold-caret svg { width: 14px; height: 14px; }
+.fx-fold.open .fx-fold-caret { transform: rotate(180deg); }
+
+/* 14 天预览条：一眼看出哪天练什么 */
+.fx-fold-mini { display: flex; gap: 3px; padding: 0 18px 15px; }
+.fx-fold-mini i {
+    flex: 1; height: 20px; border-radius: 4px;
+    background: var(--fx-soft, var(--primary-soft));
+    border: 1px solid transparent;
+    transition: transform .15s var(--ease);
+}
+.fx-fold-mini i.idle { background: var(--bg-hover); }
+.fx-fold-mini i.now { border-color: var(--text); }
+.fx-fold-mini i:hover { transform: scaleY(1.15); }
+
+.fx-fold-body { border-top: 1px solid var(--border-soft); background: var(--bg-card); }
+.fx-fold-note { padding: 11px 18px 0; font-size: 11.5px; color: var(--text-faint); }
+.fx-fold-body .fx-plan { border: none; border-radius: 0; background: var(--bg-card); }
+.fx-fold-body .fx-week { padding-left: 18px; padding-right: 18px; }
+.fx-fold-body .fx-day-row { padding-left: 18px; padding-right: 18px; }
+.fx-fold-body .fx-day-detail { padding-left: 18px; padding-right: 18px; }
+
 .fx-plan { background: var(--bg-soft); border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; }
 .fx-week {
     display: flex; align-items: center; gap: 10px;
@@ -331,6 +418,19 @@
     border-left: 3px solid var(--primary);
 }
 
+/* 卡片标题 / 按钮里的图标 */
+.fx-hico {
+    width: 26px; height: 26px; border-radius: 9px;
+    background: var(--primary-soft); color: var(--primary);
+    display: inline-flex; align-items: center; justify-content: center;
+    vertical-align: middle; margin-right: 8px;
+}
+.fx-hico svg { width: 15px; height: 15px; }
+.card-fitness .fx-bico {
+    width: 14px; height: 14px; margin-right: 4px;
+    vertical-align: -2px;
+}
+
 /* 旧结构（设置面板等）在新视觉下的微调 */
 .card-fitness .fit-empty { border-style: dashed; padding: 32px 20px; }
 .card-fitness .fit-settings {
@@ -347,20 +447,21 @@
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 900px) {
-    .fx-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .fx-mtiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
-    .fx-status { grid-template-columns: 1fr; justify-items: center; gap: 16px; }
-    .fx-ring { width: 112px; height: 112px; }
-    .fx-metrics { width: 100%; }
+    .fx-statusbar { gap: 12px; }
+    .fx-mtiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .fx-km { font-size: 38px; }
     .fx-hero-side { margin-left: 0; text-align: left; }
     .fx-day-date { width: 84px; }
     .fx-day-meta { display: none; }
     .fx-bars { gap: 4px; }
+    .fx-fold-mini i { height: 16px; }
 }
 @media (max-width: 420px) {
     .fx-bar-val { display: none; }
+    .fx-mtl-v { font-size: 16px; }
 }
 @media (max-width: 520px) {
     .fx-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
