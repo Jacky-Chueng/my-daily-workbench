@@ -1079,26 +1079,13 @@ const Fitness = (() => {
             requestedAt: Date.now(), status: "pending"
         };
         save(data);
-        // 写云端
-        const c = supabaseClient();
-        if (c) {
-            try {
-                const syncId = (window.APP_CONFIG.supabase.syncId || "main");
-                const { data: rows } = await c.from("sync_data").select("payload").eq("id", syncId).maybeSingle();
-                const payload = (rows && rows.payload) || {};
-                const fit = payload.fitness || {};
-                fit.pushWorkout = data.pushWorkout;
-                payload.fitness = fit;
-                await c.from("sync_data").upsert({ id: syncId, payload, updated_at: new Date().toISOString() });
-                Api.showToast("已提交，稍后会推到你佳明的训练计划里（去手表/App 同步后即可跟着练）", "success");
-                return;
-            } catch (e) {
-                console.error("pushWorkout 写云端失败:", e);
-                Api.showToast("写云端失败：" + (e.message || "网络问题") + "，可让我直接推", "error");
-                return;
-            }
+        // 写云端「请求队列」（独立行，不会被别的模块整包覆盖）
+        const r = await pushToQueue({ pushWorkout: data.pushWorkout });
+        if (r.ok) {
+            Api.showToast("已提交，稍后会推到你佳明的训练计划里（去手表/App 同步后即可跟着练）", "success");
+        } else {
+            Api.showToast("写云端失败：" + (r.reason || "网络问题") + "，可让我直接推", "error");
         }
-        Api.showToast("已记录到本地，但云端同步未开启，守护进程收不到", "error");
     }
 
     // 绑定挂在整张卡片上：计划行的展开、训练计划面板的开合、今日课表的推送按钮都能命中
@@ -1290,6 +1277,14 @@ const Fitness = (() => {
        2. 本机守护进程每 30s 巡一次，发现 pending 就拉数据写回（并标 done）
        3. 本页轮询云端，等 done 或 metrics 变化后自动刷新显示 */
     async function markSyncRequest() {
+        const r = await pushToQueue({ syncRequest: { requestedAt: Date.now(), status: "pending" } });
+        return r;
+    }
+
+    // 写「请求队列」：syncRequest / pushWorkout 单独存一行（id=fitness_queue）
+    // 主行 payload 会被多个页面/模块整包读-改-写，pending 请求常在守护进程轮询前
+    // 就被别的端的旧快照覆盖掉 —— 这是「点了推送但佳明没收到」的根因。
+    async function pushToQueue(patch) {
         const cfg = window.APP_CONFIG && window.APP_CONFIG.supabase;
         if (!cfg || !cfg.enabled || !cfg.url || !window.supabase) {
             return { ok: false, reason: "云同步未配置" };
@@ -1297,20 +1292,16 @@ const Fitness = (() => {
         try {
             const c = window.supabase.createClient(cfg.url, cfg.anonKey);
             const { data: rows } = await c.from("sync_data")
-                .select("payload").eq("id", cfg.syncId).maybeSingle();
-            const payload = (rows && rows.payload) || {};
-            const fit = payload.fitness || {};
-            fit.syncRequest = { requestedAt: Date.now(), status: "pending" };
-            payload.fitness = fit;
+                .select("payload").eq("id", "fitness_queue").maybeSingle();
+            const q = (rows && rows.payload) || {};
+            Object.assign(q, patch, { updatedAt: Date.now() });
             const { error } = await c.from("sync_data").upsert({
-                id: cfg.syncId,
-                payload,
-                updated_at: new Date().toISOString()
+                id: "fitness_queue", payload: q, updated_at: new Date().toISOString()
             });
             if (error) throw error;
             return { ok: true };
         } catch (e) {
-            console.error("markSyncRequest failed:", e);
+            console.error("pushToQueue failed:", e);
             return { ok: false, reason: e.message || String(e) };
         }
     }
