@@ -115,7 +115,15 @@ const CloudSync = (() => {
 
         const logs = [...(l.logs || []), ...(r.logs || [])];
         const seen = new Map();
-        logs.forEach(x => { if (x) seen.set(String(x.date) + "|" + String(x.type), x); });
+        // 同一天可能跑两次（如上午 3km + 傍晚 2km）：旧的「日期|类型」会把当天的第二次跑步合并掉，
+        // 导致新设备上的周跑量偏少。改用「日期|类型|时长|距离」做键，重复导入同一次跑步仍会合并。
+        const logKey = x => [
+            String(x.date),
+            String(x.type || ""),
+            x.durationSec != null ? Math.round(x.durationSec) : (x.duration != null ? Math.round(x.duration) : ""),
+            x.km != null ? x.km : ""
+        ].join("|");
+        logs.forEach(x => { if (x) seen.set(logKey(x), x); });
         out.logs = Array.from(seen.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
         if (l.adHoc && l.adHoc.status === "pending") {
