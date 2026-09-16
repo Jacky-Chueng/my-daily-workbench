@@ -1247,9 +1247,13 @@ const Fitness = (() => {
             const { data: rows } = await c.from("sync_data")
                 .select("payload").eq("id", syncId).maybeSingle();
             const payload = (rows && rows.payload) || {};
-            const fit = payload.fitness || {};
+            const FITK = (window.APP_CONFIG.storageKeys && window.APP_CONFIG.storageKeys.fitness) || "dw_fitness";
+            const fit = payload[FITK] || payload.fitness || {};
             fit.goal = goal;
             fit.trainingDays = trainingDays;
+            fit.gateMode = (fit.gateMode !== false);   // 别顺手把闸门开关抹掉
+            // 主 key 写 dw_fitness（cloud-sync 读这个），旧 key 同步一份给直连读的旧客户端
+            payload[FITK] = fit;
             payload.fitness = fit;
             const { error } = await c.from("sync_data").upsert({
                 id: syncId, payload, updated_at: new Date().toISOString()
@@ -1290,7 +1294,9 @@ const Fitness = (() => {
             const { data, error } = await c.from("sync_data")
                 .select("payload").eq("id", syncId).maybeSingle();
             if (error || !data || !data.payload) return null;
-            return data.payload.fitness || null;
+            // 云端里 fitness 有两个可能的键：cloud-sync 的命名空间键 dw_fitness（主），
+            // 以及 Python 脚本镜像的旧键 fitness（兼容）。两个都认，dw_fitness 优先。
+            return data.payload.dw_fitness || data.payload.fitness || null;
         } catch (e) { return null; }
     }
 
