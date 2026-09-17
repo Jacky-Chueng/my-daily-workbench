@@ -1432,7 +1432,7 @@ const Fitness = (() => {
         if (mtBox && !mtBox._bound) {
             mtBox._bound = true;
             mtBox.addEventListener("click", e => {
-                const b = e.target.closest(".fit-mtype-btn");
+                const b = e.target.closest(".fx-chipbtn");
                 if (b) markManualType(b.dataset.type);
             });
         }
