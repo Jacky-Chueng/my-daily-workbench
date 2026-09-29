@@ -105,6 +105,12 @@ const CloudSync = (() => {
         if (r.goal != null) out.goal = r.goal;
         if (r.trainingDays != null) out.trainingDays = r.trainingDays;
 
+        // 排期配置类（可练窗口 / 课表补丁 / 闸门阈值与按日覆盖 / 间歇日）：只有自动化脚本和
+        // 本机工具会写，页面从不编辑它们 —— 必须远端优先。否则页面一旦 push，就会用浏览器缓存
+        // 里的旧值把云端刚改的配置整段盖回去。
+        ["flexWindow", "planPatches", "gateOverrides", "gate", "gateMode", "intervalWeekdays"]
+            .forEach(k => { if (r[k] != null) out[k] = r[k]; });
+
         const ts2 = x => (x && (x.updatedAt || x.generatedAt || x.date ? (x.updatedAt || x.generatedAt || 0) : 0)) || 0;
         if (r.metrics != null) out.metrics = ts2(r.metrics) >= ts2(l.metrics) ? r.metrics : l.metrics;
         if (r.advice != null) out.advice = ts2(r.advice) >= ts2(l.advice) ? r.advice : l.advice;
