@@ -1023,7 +1023,10 @@ const Fitness = (() => {
                 flags,
                 gate: flags.some(f => /闸门/.test(f)),
                 isToday: p.date === t,
-                label: dObj ? `${dObj.getMonth() + 1}/${dObj.getDate()} 周${WEEK_NAMES[p.wd]}` : p.date
+                label: dObj ? `${dObj.getMonth() + 1}/${dObj.getDate()} 周${WEEK_NAMES[p.wd]}` : p.date,
+                // 灵活窗口「候选日」：非骨架日但留了可选的加练位（云端 plan 行的 candidateKm），
+                // 它是「想跑就跑、不跑也不影响计划」的可选项，不是必练课。
+                cand: Number(p.candidateKm) || 0
             };
         });
 
@@ -1061,7 +1064,7 @@ const Fitness = (() => {
                     <span class="fx-day-date">${r.label}${r.isToday ? ' <b>今天</b>' : ""}</span>
                     <span class="fx-day-dot${r.type === "rest" ? " off" : ""}"></span>
                     <span class="fx-day-type">${icon(iconOf(r.type))} ${escapeHtml(r.name)}</span>
-                    <span class="fx-day-meta">${r.type === "rest" ? "休息" : `<b>${r.km}</b> km${r.pace ? " · " + r.pace + "/km" : ""}`}</span>
+                    <span class="fx-day-meta">${r.type === "rest" ? (r.cand ? `休息 · 可选 <b>+${r.cand}</b> km` : "休息") : `<b>${r.km}</b> km${r.pace ? " · " + r.pace + "/km" : ""}`}</span>
                     ${r.gate ? `<span class="fx-chip gate">闸门</span>` : ""}
                     <span class="fx-day-caret">${icon("chevron")}</span>
                 </div>
