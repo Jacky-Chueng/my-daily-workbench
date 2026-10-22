@@ -773,43 +773,51 @@ const Fitness = (() => {
 
     function renderWeekHtml(data, today) {
         const bars = weekVolume(data, today);
-        const max = Math.max(4, Math.max.apply(null, bars.map(b => Math.max(b.plan, b.actual))));
-        const cols = bars.map(b => {
-            const km = b.done ? b.actual : b.plan;
-            const h = km ? Math.max(6, Math.round((km / max) * 100)) : 2;
-            return `<div class="fx-bar-col ${b.isToday ? "is-today" : ""}" title="${b.date} · ${km ? km + " km" : "休息"}">
-                <div class="fx-bar-slot">
-                    <div class="fx-bar-stack" style="height:${h}%">
-                        ${km ? `<span class="fx-bar-val">${km}</span>` : ""}
-                        <div class="fx-bar fx-tone-${toneOf(b.type)}${b.done ? " done" : ""}${km ? "" : " idle"}"></div>
-                    </div>
-                </div>
-                <div class="fx-bar-w">${WEEK_NAMES[b.wd]}</div>
-            </div>`;
-        }).join("");
         const doneKm = Math.round(bars.reduce((s, b) => s + b.actual, 0) * 10) / 10;
         const planKm = Math.round(bars.reduce((s, b) => s + b.plan, 0) * 10) / 10;
         const doneCount = bars.reduce((s, b) => s + b.runs, 0);
         const quality = bars.filter(b => ["tempo", "interval", "long"].includes(b.type)).length;
+        const lw = lastWeekKm(data, today);
         const td = Array.isArray(data.trainingDays) ? data.trainingDays : [];
-        const showRate = planKm > doneKm && planKm > 0;
         const md = ds => {
             const d = parseDate(ds);
             return d ? `${d.getMonth() + 1}/${d.getDate()}` : ds;
         };
+        const pct = planKm > 0 ? Math.min(100, Math.round(doneKm / planKm * 100)) : 0;
+
+        // 逐日胶囊：已完成=实色（显实际跑量）／未到=浅色（显计划量）／已过没跑=空心（显「未跑」）
+        const days = bars.map(b => {
+            const missed = !b.done && b.plan > 0 && b.date < today;
+            const km = b.done ? b.actual : b.plan;
+            const cls = b.done ? "done" : (missed ? "miss" : (km > 0 ? "plan" : "rest"));
+            const txt = b.done ? km : (km > 0 ? (missed ? "未跑" : km) : "休");
+            const tn = (TYPES[b.type] || TYPES.rest).name;
+            return `<div class="fx-day ${cls} fx-tone-${toneOf(b.type)}${b.isToday ? " is-today" : ""}"
+                        title="${b.date} · ${b.done ? "已跑 " + km + " km" : (km ? tn + " " + km + " km" : "休息")}">
+                <span class="fx-day-w">${WEEK_NAMES[b.wd]}</span>
+                <span class="fx-day-km">${txt}</span>
+            </div>`;
+        }).join("");
+
         return `<div class="fx-card">
             <div class="fx-head">
                 <span class="fx-head-ico fx-tint-c">${icon("chart")}</span>
-                <h3>本周训练量</h3>
-                <span class="fx-head-sub">实心=已完成，浅色=计划</span>
+                <h3>本周跑量</h3>
                 <span class="fx-head-right">${md(bars[0].date)} – ${md(bars[6].date)}</span>
             </div>
-            <div class="fx-chart"><div class="fx-bars">${cols}</div></div>
+            <div class="fx-vol">
+                <div class="fx-vol-top">
+                    <span class="fx-vol-num">${doneKm}<em>km</em></span>
+                    <span class="fx-vol-of">${planKm > 0 ? `/ 计划 ${planKm} km` : "本周暂无计划"}</span>
+                    ${planKm > 0 ? `<span class="fx-vol-pct">${pct}%</span>` : ""}
+                </div>
+                ${planKm > 0 ? `<div class="fx-vol-track"><div class="fx-vol-fill" style="width:${pct}%"></div></div>` : ""}
+            </div>
+            <div class="fx-vol-days">${days}</div>
             <div class="fx-chart-foot">
-                <span>已完成 <b>${doneKm} km</b></span>
                 <span>跑了 <b>${doneCount}</b> 次</span>
-                <span>质量课 <b>${quality} 场</b></span>
-                ${showRate ? `<span>完成率 <b>${Math.round(doneKm / planKm * 100)}%</b></span>` : ""}
+                <span>质量课 <b>${quality}</b> 场</span>
+                <span>上周 <b>${lw.km}</b> km</span>
             </div>
             ${td.length ? "" : `<div class="fx-week-hint">还没选训练日 · <a href="#" id="fitWeekGoto">去设置</a></div>`}
         </div>`;
